@@ -20,7 +20,7 @@ VPATH = main:src
 lib: $(LIBDIR)/$(LIBNAME).so
 
 app: bin/client.o $(LIBDIR)/$(LIBNAME).so
-	$(CC) -o $(BINDIR)/client $< $(LFLAGS)
+	$(CC) -o $(BINDIR)/client $< $(LIBDIR)/$(LIBNAME).so $(LFLAGS)
 
 $(LIBDIR)/$(LIBNAME).so: $(LIBOBJS)
 	$(CC) $(LIBOBJS) -shared -o $@
