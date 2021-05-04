@@ -6,8 +6,8 @@ SRCDIR = src
 LIBDIR = lib
 LIBNAME = libKVS
 
-LIBFILES = src/KVS-lib.c
-LSRVFILES = src/KVS-LocalServer.c
+LIBFILES = src/KVS-lib.c src/list.c src/common.c
+LSRVFILES = src/KVS-LocalServer.c src/list.c src/common.c
 ASRVFILES = 
 
 LIBOBJS =  $(addprefix $(BINDIR)/,$(notdir $(LIBFILES:.c=.o)))
@@ -17,10 +17,19 @@ HEADERS = $(wildcard $(SRCDIR)/*.h)
 
 VPATH = main:src
 
+all: lib app lserver
+
 lib: $(LIBDIR)/$(LIBNAME).so
 
-app: bin/client.o $(LIBDIR)/$(LIBNAME).so
+app: $(BINDIR)/client.o $(LIBDIR)/$(LIBNAME).so
 	$(CC) -o $(BINDIR)/client $< $(LIBDIR)/$(LIBNAME).so $(LFLAGS)
+
+lserver: $(LSRVOBJS)
+	$(CC) -o $(BINDIR)/localserver $(LSRVOBJS) $(LFLAGS)
+
+.PHONY: tests
+tests:
+	@echo Not Implemented
 
 $(LIBDIR)/$(LIBNAME).so: $(LIBOBJS)
 	$(CC) $(LIBOBJS) -shared -o $@
