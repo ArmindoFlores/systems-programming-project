@@ -2,6 +2,7 @@
 #define _COMMON_H_
 
 #include <stdlib.h>
+#define SERVER_ADDR "/tmp/KVS-local-server"
 
 typedef enum {
     ACK,

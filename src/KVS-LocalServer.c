@@ -128,6 +128,7 @@ void *connection_handler_thread(void *args)
 
    close(ta->socket);
    free(ta);
+   printf("Disconnected\n");
    return NULL;
 }
 
@@ -140,7 +141,7 @@ void *main_listener_thread(void *args)
    while (1) {
       // Listen for new connections
       int new_socket = accept(ta->socket, (struct sockaddr*)&incoming, &length);
-      printf("Got a new connection from %s\n", incoming.sun_path);
+      printf("Got a new connection!\n");
 
       // Start up new thread responsible for this connection
       conn_handler_ta *args = (conn_handler_ta*) malloc(sizeof(conn_handler_ta));
@@ -163,7 +164,7 @@ void *main_listener_thread(void *args)
 int main() 
 {
    // Create local socket
-   int s = init_main_socket("/tmp/KVS-local-server");
+   int s = init_main_socket(SERVER_ADDR);
 
    // Start up new thread to handle connections
    main_listener_ta args = { s };
