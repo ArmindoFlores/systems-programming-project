@@ -18,7 +18,7 @@ HEADERS = $(wildcard $(SRCDIR)/*.h)
 VPATH = main:src
 
 all: lib app lserver
-
+	
 lib: $(LIBDIR)/$(LIBNAME).so
 
 app: $(BINDIR)/client.o $(LIBDIR)/$(LIBNAME).so
@@ -35,6 +35,8 @@ $(LIBDIR)/$(LIBNAME).so: $(LIBOBJS)
 	$(CC) $(LIBOBJS) -shared -o $@
 
 $(BINDIR)/%.o: %.c | $(HEADERS)
+	mkdir -p $(LIBDIR)
+	mkdir -p $(BINDIR)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 clean:
