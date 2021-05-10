@@ -9,6 +9,7 @@ typedef enum {
     PUT_VALUE,
     GET_VALUE,
     REGISTER_CALLBACK,
+    DISCONNECT,
     EINTERNAL,
     EINVALID
 } msgtype_t;

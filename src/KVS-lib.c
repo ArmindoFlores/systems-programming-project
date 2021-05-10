@@ -30,7 +30,7 @@ int establish_connection (char *group_id, char *secret)
         return DISCONNECTED;
 
     connected = 1;
-    return 1;
+    return SUCCESS;
 }
 
 int put_value(char *key, char *value)
@@ -85,6 +85,13 @@ int register_callback(char *key, void (*callback_function)(char *))
 
 int close_connection()
 {
+    msgheader_t header;
+    header.type = DISCONNECT;
+    header.size = 0;
+
+    if (sendall(server, (char*)&header, sizeof(header)) != 0)
+        return DISCONNECTED;
+
     close(server);
-    connected = 0;
+    return SUCCESS;
 }

@@ -2,6 +2,7 @@
 #define _KVS_LIB_
 
 typedef enum {
+    SUCCESS = 0,
     DISCONNECTED = -1,
     UNKNOWN = -2,
     INVALID = -3,
