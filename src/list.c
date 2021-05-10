@@ -30,10 +30,8 @@ void ulist_remove_element(ulist_t *l, ulistelement_t *element)
 ulist_t *ulist_create(void (*free_element)(void*))
 {
     ulist_t *new_list = (ulist_t*) malloc(sizeof(ulist_t));
-    if (new_list == NULL) {
-        fprintf(stderr, "Memory allocation error\n"); 
-        exit(EXIT_FAILURE);
-    }
+    if (new_list == NULL) 
+        return NULL;
     new_list->free_element = free_element;
     new_list->head = NULL;
     new_list->tail = NULL;
@@ -55,13 +53,11 @@ void ulist_free(ulist_t* l)
     free(l);
 }
 
-void ulist_pushback(ulist_t* l, void* element)
+int ulist_pushback(ulist_t* l, void* element)
 {
     ulistelement_t *new_element = (ulistelement_t*) malloc(sizeof(ulistelement_t));
-    if (new_element == NULL) {
-        fprintf(stderr, "Memory allocation error\n"); 
-        exit(EXIT_FAILURE);
-    }
+    if (new_element == NULL) 
+        return 1;
     new_element->value = element;
 
     new_element->next = NULL;
@@ -76,15 +72,14 @@ void ulist_pushback(ulist_t* l, void* element)
         l->tail = new_element;
     }
     l->size++;
+    return 0;
 }
 
-void ulist_pushfront(ulist_t* l, void* element)
+int ulist_pushfront(ulist_t* l, void* element)
 {
     ulistelement_t *new_element = (ulistelement_t*) malloc(sizeof(ulistelement_t));
-    if (new_element == NULL) {
-        fprintf(stderr, "Memory allocation error\n"); 
-        exit(EXIT_FAILURE);
-    }
+    if (new_element == NULL) 
+        return 1;
     new_element->value = element;
 
     new_element->next = l->head;
@@ -99,6 +94,7 @@ void ulist_pushfront(ulist_t* l, void* element)
         l->head = new_element;
     }
     l->size++;
+    return 0;
 }
 
 void *ulist_popback(ulist_t* l)

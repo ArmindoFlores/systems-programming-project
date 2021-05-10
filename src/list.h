@@ -1,5 +1,5 @@
-#ifndef LIBUTILS_LIST_H
-#define LIBUTILS_LIST_H
+#ifndef _LIST_H_
+#define _LIST_H_
 
 #include <stdlib.h>
 
@@ -21,12 +21,12 @@ void ulist_free(ulist_t*);
 /*
  * Adds a new element to the end of the list
  */
-void ulist_pushback(ulist_t*, void* element);
+int ulist_pushback(ulist_t*, void* element);
 
 /*
  * Adds a new element to the front of the list
  */
-void ulist_pushfront(ulist_t*, void* element);
+int  ulist_pushfront(ulist_t*, void* element);
 
 /*
  * Removes the last element from the list and returns its value
