@@ -8,6 +8,7 @@ typedef struct ulist ulist_t;
 /*
  * Creates a new list. If free_element != NULL, free_element(element) is called
  * for every element in the list when freeing it.
+ * Returns NULL if any errors occurr.
  */
 ulist_t *ulist_create(void (*free_element)(void*));
 
@@ -19,12 +20,14 @@ void ulist_free(ulist_t*);
 
 
 /*
- * Adds a new element to the end of the list
+ * Adds a new element to the end of the list. Returns -1 for
+ * errors and 0 otherwise.
  */
 int ulist_pushback(ulist_t*, void* element);
 
 /*
- * Adds a new element to the front of the list
+ * Adds a new element to the front of the list. Returns -1 for
+ errors and 0 otherwise.
  */
 int  ulist_pushfront(ulist_t*, void* element);
 
