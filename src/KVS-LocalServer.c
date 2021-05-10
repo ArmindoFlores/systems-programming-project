@@ -1,3 +1,4 @@
+#define  _GNU_SOURCE // Otherwise we get a warning about getline()
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 #include "KVS-LocalServer.h"
 #include "common.h"
 #include "list.h"
+#include "ssdict.h"
 #define MAX_KEY_SIZE 1024
 #define MAX_VALUE_SIZE 65536
 
