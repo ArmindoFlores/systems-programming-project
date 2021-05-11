@@ -32,7 +32,7 @@ tests:
 	@echo Not Implemented
 
 $(LIBDIR)/$(LIBNAME).so: $(LIBOBJS)
-	$(CC) $(LIBOBJS) -shared -o $@
+	$(CC) $(LIBOBJS) -o $@ -shared
 
 $(BINDIR)/%.o: %.c | $(HEADERS)
 	mkdir -p $(LIBDIR)

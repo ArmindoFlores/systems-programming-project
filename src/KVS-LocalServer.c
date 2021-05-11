@@ -15,6 +15,33 @@
 #define MAX_KEY_SIZE 1024
 #define MAX_VALUE_SIZE 65536
 
+
+typedef struct {
+    char *groupid;
+    ssdict_t *d;
+    pthread_mutex_t mutex;
+} glelement_t;
+
+static struct gl {
+    ulist_t *list;
+    pthread_mutex_t mutex;
+} grouplist;
+
+
+void free_glelement(void *arg)
+{
+    glelement_t *element = (glelement_t*) arg;
+    ssdict_free(element->d);
+    free(element->groupid);
+    pthread_mutex_destroy(&element->mutex);
+    free(element);
+}
+
+int find_glelement(const void *element, void* arg)
+{
+    return strcmp(((glelement_t*)element)->groupid, (char*) arg) == 0;
+}
+
 int init_main_socket(char *sock_path)
 {
     int s;
@@ -41,12 +68,12 @@ int init_main_socket(char *sock_path)
     return s;
 }
 
-int msg_put_value(int socket, msgheader_t *h) 
+int msg_put_value(int socket, msgheader_t *h, char *groupid) 
 {
     msgheader_t msg;
     msg.size = 0;
     char *key, *value;
-    int ksize, vsize;
+    size_t ksize, vsize;
 
     // Make sure the message size makes sense (has to contain at least ksize and vsize)
     if (h->size < sizeof(ksize) + sizeof(vsize))
@@ -66,6 +93,15 @@ int msg_put_value(int socket, msgheader_t *h)
     key = (char*) calloc(ksize+1, sizeof(char));
     value = (char*) calloc(vsize+1, sizeof(char));
 
+    if (key == NULL || value == NULL) {
+        // Read all data, but ignore it and exit
+        recvall(socket, NULL, ksize);
+        recvall(socket, NULL, vsize);
+        msg.type = EINTERNAL;
+        sendall(socket, (char*)&msg, sizeof(msg));
+        return 1;
+    }
+
     // Attempt to receive KV pair
     if (recvall(socket, key, ksize) != 0) {
         free(key);
@@ -79,7 +115,29 @@ int msg_put_value(int socket, msgheader_t *h)
     }
 
     //TODO: Add the key-value pair to the stored key-value pairs
+    pthread_mutex_lock(&grouplist.mutex);
+    glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);
+    if (group == NULL) { 
+        // Group was deleted, notify client and close the connection
+        free(key);
+        free(value);
+        msg.type = EGROUP_DELETED;
+        sendall(socket, (char*)&msg, sizeof(msg));
+        pthread_mutex_unlock(&grouplist.mutex);
+        return 0;
+    }
+    if (ssdict_set(group->d, key, value) != 0) {
+        // Internal error occurred (keep going?)
+        free(key);
+        free(value);
+        msg.type = EINTERNAL;
+        sendall(socket, (char*)&msg, sizeof(msg));
+        pthread_mutex_unlock(&grouplist.mutex);
+        return 1;
+    }
+
     printf("[%d] Stored the KV pair (%s, %s)\n", socket, key, value);
+    pthread_mutex_unlock(&grouplist.mutex);
 
     msg.type = ACK;
 
@@ -105,16 +163,75 @@ int msg_register_callback()
 
 void *connection_handler_thread(void *args)
 {
+    int running = 1;
     conn_handler_ta *ta = (conn_handler_ta*) args;
+    char *groupid = NULL;
+    size_t gidlen;
+
+    if (recvall(ta->socket, (char*)&gidlen, sizeof(gidlen)) != 0) {
+        close(ta->socket);
+        free(ta);
+        printf("Disconnected\n");
+        return NULL;
+    }
+
+    groupid = (char*) malloc(sizeof(char)*(gidlen + 1));
+    if (groupid == NULL) {
+        close(ta->socket);
+        free(ta);
+        printf("Disconnected (internal error)\n");
+        return NULL;
+    }
+
+    if (recvall(ta->socket, groupid, gidlen) != 0) {
+        running = 0;
+    }
+    else {
+        groupid[gidlen] = '\0';
+        pthread_mutex_lock(&grouplist.mutex);
+        glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);
+        if (group == NULL) { // No information is stored for this group yet
+            group = (glelement_t*) malloc(sizeof(glelement_t));
+            if (group == NULL) {
+                free(groupid);
+                close(ta->socket);
+                free(ta);
+                printf("Disconnected (internal error)\n");
+                return NULL;
+            }
+            group->d = ssdict_create(16);
+            group->groupid = (char*) malloc(sizeof(char)*(gidlen+1));
+            if (group->d == NULL || group->groupid == NULL) {
+                free(group->d);
+                free(group->groupid);
+                free(groupid);
+                close(ta->socket);
+                free(ta);
+                printf("Disconnected (internal error)\n");
+                return NULL;
+            }
+            strcpy(group->groupid, groupid);
+            group->groupid[gidlen] = '\0';
+            pthread_mutex_init(&group->mutex, NULL);
+            if (ulist_pushback(grouplist.list, group) != 0) {
+                free(groupid);
+                free_glelement(group);
+                close(ta->socket);
+                free(ta);
+                printf("Disconnected (internal error)\n");
+                return NULL;
+            }
+        }
+        pthread_mutex_unlock(&grouplist.mutex);
+    }
 
     msgheader_t header;
-    int running = 1;
     while (running) {
         if (recvall(ta->socket, (char*)&header, sizeof(header)) != 0) 
             break;
         switch (header.type) {
             case PUT_VALUE:
-                running = msg_put_value(ta->socket, &header);
+                running = msg_put_value(ta->socket, &header, groupid);
                 break;
             case GET_VALUE:
                 running = msg_get_value();
@@ -131,6 +248,7 @@ void *connection_handler_thread(void *args)
         }
     }
 
+    free(groupid);
     close(ta->socket);
     free(ta);
     printf("Disconnected\n");
@@ -150,6 +268,11 @@ void *main_listener_thread(void *args)
 
         // Start up new thread responsible for this connection
         conn_handler_ta *args = (conn_handler_ta*) malloc(sizeof(conn_handler_ta));
+        if (args == NULL) {
+            close(new_socket);
+            printf("Error allocating memory!\n");
+            continue;
+        }
         args->socket = new_socket;
         args->client = incoming;
         args->length = length;
@@ -168,6 +291,10 @@ void *main_listener_thread(void *args)
 
 int main() 
 {
+    // Create list of groups and dicts
+    grouplist.list = ulist_create(free_glelement);
+    pthread_mutex_init(&grouplist.mutex, NULL);
+
     // Create local socket
     int s = init_main_socket(SERVER_ADDR);
 
@@ -192,4 +319,6 @@ int main()
     }
 
     free(line);
+    pthread_mutex_destroy(&grouplist.mutex);
+    ulist_free(grouplist.list);
 }

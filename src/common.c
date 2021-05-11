@@ -28,6 +28,7 @@ int sendall(int socket, char *buffer, size_t n)
             return errno;
         else if (sent == 0) // Client disconnected
             return 1;
+        total += sent;
     }
     return 0;
 }

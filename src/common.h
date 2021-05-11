@@ -8,10 +8,14 @@ typedef enum {
     ACK,
     PUT_VALUE,
     GET_VALUE,
+    DEL_VALUE,
     REGISTER_CALLBACK,
     DISCONNECT,
     EINTERNAL,
-    EINVALID
+    EINVALID,
+    EGROUP_DELETED,
+    KEY_FOUND,
+    KEY_NOTFOUND
 } msgtype_t;
 
 typedef struct {

@@ -95,7 +95,7 @@ int ssdict_set(ssdict_t *d, char *key, char *value)
         pair->key[klen] = '\0';
 
         if (ulist_pushback(d->pairs[hash], (void*)pair) != 0)
-            return 1;
+            return 0;
     }
 
     return 0;
