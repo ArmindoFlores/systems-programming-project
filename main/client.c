@@ -7,8 +7,10 @@ int main()
 
     printf("Result: %d\n", result);
 
-    result = establish_connection("hello", "123"); // Should return an error code
+    if (result != 0) return 1;
 
+    result = put_value("this is my key", "this is my value");
+    
     printf("Result: %d\n", result);
 
     close_connection();

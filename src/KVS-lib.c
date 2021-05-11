@@ -42,7 +42,7 @@ int establish_connection (char *group_id, char *secret)
 
 int put_value(char *key, char *value)
 {
-    if(connected){
+    if(connected) {
         size_t ksize = strlen(key), vsize = strlen(value);
         msgheader_t header;
         header.type = PUT_VALUE;
@@ -90,53 +90,53 @@ int put_value(char *key, char *value)
 
 int get_value(char *key, char **value)
 {
-    if(connected){
+    if(connected) {
         size_t ksize = strlen(key),vsize;
         char *sv_value;
         msgheader_t header;
         msgheader_t sv_header;
         header.type = GET_VALUE;
-        header.size = sizeof(ksize)+ ksize;
+        header.size = sizeof(ksize) + ksize;
 
-        if (sendall(server, (char*)&header, sizeof(header)) != 0){      //HEADER
+        if (sendall(server, (char*)&header, sizeof(header)) != 0) {      //HEADER
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }  
+        }  
 
         if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0) {       //send ksize
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }  
+        }  
 
         if (sendall(server, key, ksize) != 0){                           //send key
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }      
+        }      
 
-        if (recvall(server, (char*)&sv_header, sizeof(header)) != 0){    //receive sv_header
+        if (recvall(server, (char*)&sv_header, sizeof(header)) != 0) {    //receive sv_header
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }  
+        }  
 
-        if(sv_header.type!=KEY_FOUND){                                   //Check if Key Found
+        if(sv_header.type != KEY_FOUND){                                   //Check if Key Found
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }  
+        }  
         
         if (recvall(server, (char*)&vsize, sizeof(vsize)) != 0){         //receive vsize
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }  
+        }  
 
-        sv_value = (char*) malloc(sizeof(char)*vsize+1);                //allocate space for value
+        sv_value = (char*) malloc(sizeof(char)*(vsize+1));                //allocate space for value
 
         if (recvall(server, (char*)&sv_value, vsize) != 0){             //receive value
             connected = DISCONNECTED;
             return DISCONNECTED;
-            }  
+        }  
 
-        sv_value[vsize]='\0';
-        *value=sv_value;
+        sv_value[vsize] = '\0';
+        *value = sv_value;
         return 1;
     }
     return DISCONNECTED;
@@ -144,34 +144,34 @@ int get_value(char *key, char **value)
 
 int delete_value(char *key)
 {
-    if(connected){
+    if(connected) {
         size_t ksize = strlen(key);
         msgheader_t header;
         msgheader_t sv_header;
         header.type = DEL_VALUE;
-        header.size = sizeof(ksize)+ ksize;
+        header.size = sizeof(ksize) + ksize;
 
-        if (sendall(server, (char*)&header, sizeof(header)) != 0){       //HEADER
+        if (sendall(server, (char*)&header, sizeof(header)) != 0) {       //HEADER
             connected = DISCONNECTED;
             return DISCONNECTED;
         }
 
-        if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0){         //send ksize
+        if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0) {         //send ksize
             connected = DISCONNECTED;
             return DISCONNECTED;
         }
 
-        if (sendall(server, key, ksize) != 0){                           //send key
+        if (sendall(server, key, ksize) != 0) {                           //send key
             connected = DISCONNECTED;
             return DISCONNECTED;
         } 
 
-        if (recvall(server, (char*)&sv_header, sizeof(header)) != 0){   //receive sv_header
+        if (recvall(server, (char*)&sv_header, sizeof(header)) != 0) {   //receive sv_header
             connected = DISCONNECTED;
             return DISCONNECTED;
         }
 
-        if(sv_header.type!=KEY_FOUND)                                   //Check if Key Found
+        if(sv_header.type != KEY_FOUND)                                   //Check if Key Found
             return KEY_NOTFOUND;
 
         return 1;
