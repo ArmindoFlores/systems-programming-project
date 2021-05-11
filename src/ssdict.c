@@ -109,3 +109,17 @@ const char* ssdict_get(ssdict_t *d, char *key)
         return NULL;
     return pair->value;
 }
+
+void print_elements(void* arg, void* ignore)
+{
+    sspair *pair = (sspair*) arg;
+    printf("    \"%s\": \"%s\",\n", pair->key, pair->value);
+}
+
+void ssdict_print(const ssdict_t *d)
+{
+    printf("{\n");
+    for (int i = 0; i < d->capacity; i++)
+        ulist_exec(d->pairs[i], print_elements, NULL);
+    printf("}");
+}

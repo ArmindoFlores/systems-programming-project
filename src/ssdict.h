@@ -26,4 +26,6 @@ const char *ssdict_get(ssdict_t*, char* key);
  */
 int ssdict_set(ssdict_t*, char* key, char* value);
 
+void ssdict_print(const ssdict_t*);
+
 #endif
