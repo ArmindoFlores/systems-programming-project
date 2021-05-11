@@ -68,7 +68,7 @@ int put_value(char *key, char *value)
             return DISCONNECTED;
         }  
 
-        if (sendall(server, value, ksize) != 0){
+        if (sendall(server, value, vsize) != 0){
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
