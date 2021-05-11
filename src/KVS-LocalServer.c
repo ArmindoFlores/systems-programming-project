@@ -72,6 +72,7 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
 {
     msgheader_t msg;
     msg.size = 0;
+    msg.type = ACK;
     char *key, *value;
     size_t ksize, vsize;
 
@@ -84,6 +85,8 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
 
     if (recvall(socket, (char*)&vsize, sizeof(vsize)) != 0)
         return 0;
+
+    printf("%lu, %lu\n", ksize, vsize);
 
     // Make sure the client is sending valid sizes
     if (ksize == 0 || vsize == 0 || ksize >= MAX_KEY_SIZE || vsize >= MAX_VALUE_SIZE)
@@ -108,6 +111,7 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
         free(value);
         return 0;
     }
+
     if (recvall(socket, value, vsize) != 0) {
         free(key);
         free(value);
@@ -136,10 +140,8 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
         return 1;
     }
 
-    printf("[%d] Stored the KV pair (%s, %s)\n", socket, key, value);
+    printf("[%d] Stored the KV pair ('%s', '%s')\n", socket, key, value);
     pthread_mutex_unlock(&grouplist.mutex);
-
-    msg.type = ACK;
 
     free(key);
     free(value);
