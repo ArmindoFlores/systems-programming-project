@@ -42,6 +42,14 @@ int find_glelement(const void *element, void* arg)
     return strcmp(((glelement_t*)element)->groupid, (char*) arg) == 0;
 }
 
+void print_glelement(void *arg, void *ignore)
+{
+    glelement_t *element = (glelement_t*) arg;
+    printf("%s -> ", element->groupid);
+    ssdict_print(element->d);
+    printf("\n");
+}
+
 int init_main_socket(char *sock_path)
 {
     int s;
@@ -318,6 +326,10 @@ int main()
 
         if (strncmp(line, "exit", 4) == 0)
             break;
+
+        else if (strncmp(line, "dicts", 5) == 0) {
+            ulist_exec(grouplist.list, print_glelement, NULL);
+        }
     }
 
     free(line);
