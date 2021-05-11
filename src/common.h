@@ -21,7 +21,7 @@ typedef enum {
 typedef struct {
     size_t size;
     msgtype_t type;
-} msgheader_t;
+} __attribute__((packed)) msgheader_t;
 
 /*
  * Loops until exactly n bytes are read from the socket.
