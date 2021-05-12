@@ -32,7 +32,6 @@ int main(int argc, char *argv[])
         printf(">>> ");
         getline(&line, &size, stdin);
         argN= sscanf(line, "%" STR(16) "s %" XSTR(MAX_KEY_SIZE) "s %" XSTR(MAX_VALUE_SIZE) "s", &cmd, &key, &value);
-        printf("%s %d",cmd, getOption(cmd));
         switch(getOption(cmd)){
             case 0: //exit
                 running = 0;
