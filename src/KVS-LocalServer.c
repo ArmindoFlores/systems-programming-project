@@ -200,6 +200,7 @@ void *connection_handler_thread(void *args)
         groupid[gidlen] = '\0';
         pthread_mutex_lock(&grouplist.mutex);
         glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);
+       
         if (group == NULL) { // No information is stored for this group yet
             group = (glelement_t*) malloc(sizeof(glelement_t));
             if (group == NULL) {
@@ -327,9 +328,8 @@ int main()
         if (strncmp(line, "exit", 4) == 0)
             break;
 
-        else if (strncmp(line, "dicts", 5) == 0) {
+        else if (strncmp(line, "dicts", 5) == 0)
             ulist_exec(grouplist.list, print_glelement, NULL);
-        }
     }
 
     free(line);
