@@ -9,6 +9,8 @@
 #define XSTR(a) STR(a)
 #define STR(a) #a
 
+char getOption(char* arg);
+
 int main(int argc, char *argv[]) 
 {
     int result;
@@ -24,37 +26,68 @@ int main(int argc, char *argv[])
 
     // Process user commands
     char *line = NULL, key[MAX_KEY_SIZE], value[MAX_VALUE_SIZE], cmd[16];
-    size_t size = 0;
-    while (1) {
+    size_t size = 0, argN;
+    char running=1, r;
+    while (running) {
         printf(">>> ");
         getline(&line, &size, stdin);
+        argN= sscanf(line, "%" STR(16) "s %" XSTR(MAX_KEY_SIZE) "s %" XSTR(MAX_VALUE_SIZE) "s", &cmd, &key, &value);
+        printf("%s %d",cmd, getOption(cmd));
+        switch(getOption(cmd)){
+            case 0: //exit
+                running = 0;
+                break;
 
-        if (strcmp(line, "exit\n") == 0)
-            break;
-
-
-        if (sscanf(line, "%" STR(16) "s %" XSTR(MAX_KEY_SIZE) "s %" XSTR(MAX_VALUE_SIZE) "s", &cmd, &key, &value) == 3) {
-            if (strcmp(cmd, "put") == 0) {
-                int r = put_value(key, value);
+            case 1: //put
+                if(argN!=3){
+                    fprintf(stderr, "put <key> <value>\n");
+                    break;
+                }
+                r = put_value(key, value);
                 if (r != 1)
                     fprintf(stderr, "An error occurred while talking to the server (ERRNO %d)\n", r);
-            }
-        }
+                break;
 
-        if (sscanf(line, "%" STR(16) "s %" XSTR(MAX_KEY_SIZE) "s", &cmd, &key) == 2) {
-            if (strcmp(cmd, "get") == 0) {
+            case 2: //get
+                if(argN!=2){
+                    fprintf(stderr, "get <key>\n");
+                    break;
+                }
                 char *v = NULL;
-                int r = get_value(key, &v);
+                r = get_value(key, &v);
                 if (r != 1)
                     fprintf(stderr, "An error occurred while talking to the server (ERRNO %d)\n", r);
                 else
                     printf("%s -> %s\n", key, v);
                 free(v);
-            }
+                break;
+
+            case 3: //delete
+                if(argN!=2){
+                    fprintf(stderr, "delete <key>\n");
+                    break;
+                }
+                r = delete_value(key);
+                if (r != 1)
+                    fprintf(stderr, "An error occurred while talking to the server (ERRNO %d)\n", r);
+                break;
+
+            default:
+                fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tput <key> <value> ---> Assigns the value to the key\n\tget <key> --> Retrieves value from specified key\n\n");
+                break;
         }
     }
-
     free(line);
     close_connection();
     printf("Disconnected\n");
+    return 0;
+}
+
+
+char getOption(char* arg){
+    if(strcmp(arg, "exit")==0) return 0;
+    if(strcmp(arg, "put")==0)  return 1;
+    if(strcmp(arg, "get")==0)  return 2;
+    if(strcmp(arg, "delete")==0)  return 3;
+    return -1;
 }
