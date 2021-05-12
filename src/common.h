@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #define SERVER_ADDR "/tmp/KVS-local-server"
+#define MAX_KEY_SIZE 1024
+#define MAX_VALUE_SIZE 65536
 
 typedef enum {
     ACK,
@@ -33,6 +35,6 @@ int recvall(int socket, char *buffer, size_t n);
  * Loops until exactly n bytes are sent to the socket.
  * If an error occurrs, errno is returned. Otherwise it returns 0.
  */
-int sendall(int socket, char *buffer, size_t n);
+int sendall(int socket, const char *buffer, size_t n);
 
 #endif

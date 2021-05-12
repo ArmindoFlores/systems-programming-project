@@ -28,7 +28,7 @@ int recvall(int socket, char *buffer, size_t n)
     return 0;
 }
 
-int sendall(int socket, char *buffer, size_t n)
+int sendall(int socket, const char *buffer, size_t n)
 {
     size_t total = 0;
     while (total < n) {
