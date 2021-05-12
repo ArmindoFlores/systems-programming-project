@@ -20,7 +20,8 @@ void ssdict_free(ssdict_t*);
 const char *ssdict_get(ssdict_t*, char* key);
 
 /*
- * If the key is in the dictionary, updates the value.
+ * If the key is in the dictionary, updates the value (if value is NULL,
+ * the item is deleted).
  * Otherwise, adds an item (key, value) to the dictionary. 
  * Returns 0 upon sucess, 1 otherwise.
  */

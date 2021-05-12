@@ -125,61 +125,69 @@ void ssdict_free(ssdict_t *d)
 
 int ssdict_set(ssdict_t *d, char *key, char *value)
 {
-    size_t klen = strlen(key), vlen = strlen(value);
-    char *vbuffer = (char*) malloc(sizeof(char) * (vlen+1));
-    if (vbuffer == NULL)
-        return 1;
-
-    strcpy(vbuffer, value);
-    vbuffer[vlen] = '\0';
-
     unsigned long hash = hash33(key) % d->capacity;
 
-    // Now we search for the key in the hash's corresponding list
-    sspair *found = (sspair*) ulist_find_element_if(d->pairs[hash], find_key, (void*)key);
-    if (found != NULL) {
-        // Key already exists in the dictionary, so we need only change the value
-        free(found->value);
-        found->value = vbuffer;
+    // value == NULL => delete item
+    if (value == NULL) {
+        // Search for the key in the dictionary and remove it if it exists
+        return ulist_remove_if(d->pairs[hash], find_key, (void*)key);
     }
+    // value != NULL => add/set item
     else {
-        // Key doesn't exist in the dictionary, so we create it
-        sspair *pair = (sspair*) malloc(sizeof(sspair));
-        if (pair == NULL) {
-            free(vbuffer);
+        size_t klen = strlen(key), vlen = strlen(value);
+        char *vbuffer = (char*) malloc(sizeof(char) * (vlen+1));
+        if (vbuffer == NULL)
             return 1;
+
+        strcpy(vbuffer, value);
+        vbuffer[vlen] = '\0';
+        
+        // Now we search for the key in the hash's corresponding list
+        sspair *found = (sspair*) ulist_find_element_if(d->pairs[hash], find_key, (void*)key);
+        if (found != NULL) {
+            // Key already exists in the dictionary, so we need only change the value
+            free(found->value);
+            found->value = vbuffer;
         }
-        pair->key = (char*) malloc(sizeof(char) * (klen+1));
-        if (pair->key == NULL) {
-            free(vbuffer);
-            free(pair);
-            return 1;
+        else {
+            // Key doesn't exist in the dictionary, so we create it
+            sspair *pair = (sspair*) malloc(sizeof(sspair));
+            if (pair == NULL) {
+                free(vbuffer);
+                return 1;
+            }
+            pair->key = (char*) malloc(sizeof(char) * (klen+1));
+            if (pair->key == NULL) {
+                free(vbuffer);
+                free(pair);
+                return 1;
+            }
+
+            pair->value = vbuffer;
+            strcpy(pair->key, key);
+            pair->key[klen] = '\0';
+
+            if (ulist_pushback(d->pairs[hash], (void*)pair) != 0) {
+                free(vbuffer);
+                free(pair->key);
+                free(pair);
+                return 1;
+            }
+
+            d->size++;
         }
 
-        pair->value = vbuffer;
-        strcpy(pair->key, key);
-        pair->key[klen] = '\0';
+        // Check if dictionary needs resizing
+        // TODO: This is probably not what we want. A better way of doing this
+        // TODO: would be to check if this list's length is greater than a certain
+        // TODO: threshold. This way we could resize if, for example, few items were in
+        // TODO: the dictionary but a long chain had been created (slowing lookup times).
+        // TODO: Maybe research what the better condition is?
+        if (d->size >= 2*d->capacity)
+            ssdict_resize(d, d->capacity*4);
 
-        if (ulist_pushback(d->pairs[hash], (void*)pair) != 0) {
-            free(vbuffer);
-            free(pair->key);
-            free(pair);
-            return 1;
-        }
-
-        d->size++;
+        return 0;
     }
-
-    // Check if dictionary needs resizing
-    // TODO: This is probably not what we want. A better way of doing this
-    // TODO: would be to check if this list's length is greater than a certain
-    // TODO: threshold. This way we could resize if, for example, few items were in
-    // TODO: the dictionary but a long chain had been created (slowing lookup times).
-    // TODO: Maybe research what the better condition is?
-    if (d->size >= 2*d->capacity)
-        ssdict_resize(d, d->capacity*4);
-
-    return 0;
 }
 
 const char* ssdict_get(ssdict_t *d, char *key)
