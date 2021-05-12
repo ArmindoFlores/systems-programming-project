@@ -162,12 +162,12 @@ void *ulist_find_element_if(const ulist_t* l, int (*verify)(const void*, void*),
     return NULL;
 }
 
-void ulist_remove(ulist_t* l, void* element)
+int ulist_remove(ulist_t* l, void* element)
 {
-    ulist_remove_if(l, verify_equal, element);
+    return ulist_remove_if(l, verify_equal, element);
 }
 
-void ulist_remove_if(ulist_t* l, int (*verify)(const void*, void*), void* args)
+int ulist_remove_if(ulist_t* l, int (*verify)(const void*, void*), void* args)
 {
     for (ulistelement_t *aux = l->head; aux != NULL; aux = aux->next) {
         if (verify(aux->value, args)) {
@@ -177,9 +177,10 @@ void ulist_remove_if(ulist_t* l, int (*verify)(const void*, void*), void* args)
                 l->free_element(aux->value);
             free(aux);
             l->size--;
-            break;
+            return 0;
         }
     }
+    return 1;
 }
 
 void *ulist_pop(ulist_t* l, size_t i)

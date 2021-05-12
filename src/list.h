@@ -70,14 +70,16 @@ void *ulist_find_element(const ulist_t*, void* element);
 void *ulist_find_element_if(const ulist_t*, int (*verify)(const void*, void*), void* args);
 
 /*
- * Removes an element from the list
+ * Removes an element from the list.
+ * Returns 0 on success, 1 otherwise.
  */
-void ulist_remove(ulist_t*, void* element);
+int ulist_remove(ulist_t*, void* element);
 
 /*
  * Removes the first element of the list for which verify(element, args) != 0
+ * Returns 0 on success, 1 otherwise.
  */
-void ulist_remove_if(ulist_t*, int (*verify)(const void*, void*), void* args);
+int ulist_remove_if(ulist_t*, int (*verify)(const void*, void*), void* args);
 
 /*
  * Removes the ith element from the list and returns its value.
