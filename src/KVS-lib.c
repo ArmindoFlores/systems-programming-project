@@ -42,38 +42,38 @@ int establish_connection (char *group_id, char *secret)
 
 int put_value(char *key, char *value)
 {
-    if(connected) {
+    if (connected) {
         size_t ksize = strlen(key), vsize = strlen(value);
         msgheader_t header;
         header.type = PUT_VALUE;
         header.size = sizeof(ksize) + sizeof(vsize) + ksize + vsize;
 
-        if (sendall(server, (char*)&header, sizeof(header)) != 0){
+        if (sendall(server, (char*)&header, sizeof(header)) != 0) {
             connected = DISCONNECTED;
             return DISCONNECTED;
         }   
 
-        if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0){
+        if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0) {
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
 
-        if (sendall(server, (char*)&vsize, sizeof(vsize)) != 0){
+        if (sendall(server, (char*)&vsize, sizeof(vsize)) != 0) {
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
 
-        if (sendall(server, key, ksize) != 0){
+        if (sendall(server, key, ksize) != 0) {
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
 
-        if (sendall(server, value, vsize) != 0){
+        if (sendall(server, value, vsize) != 0) {
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
 
-        if (recvall(server, (char*)&header, sizeof(header)) != 0){
+        if (recvall(server, (char*)&header, sizeof(header)) != 0) {
              connected = DISCONNECTED;
             return DISCONNECTED;
         }  
@@ -90,8 +90,8 @@ int put_value(char *key, char *value)
 
 int get_value(char *key, char **value)
 {
-    if(connected) {
-        size_t ksize = strlen(key),vsize;
+    if (connected) {
+        size_t ksize = strlen(key);
         char *sv_value;
         msgheader_t header;
         msgheader_t sv_header;
@@ -101,50 +101,47 @@ int get_value(char *key, char **value)
         if (sendall(server, (char*)&header, sizeof(header)) != 0) {      //HEADER
             connected = DISCONNECTED;
             return DISCONNECTED;
-        }  
+        }
 
-        if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0) {       //send ksize
+        if (sendall(server, (char*)&ksize, sizeof(ksize)) != 0) {            //send keysize
             connected = DISCONNECTED;
             return DISCONNECTED;
-        }  
+        }
 
         if (sendall(server, key, ksize) != 0){                           //send key
             connected = DISCONNECTED;
             return DISCONNECTED;
-        }      
+        }
 
         if (recvall(server, (char*)&sv_header, sizeof(header)) != 0) {    //receive sv_header
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
 
-        if(sv_header.type != KEY_FOUND){                                   //Check if Key Found
-            connected = DISCONNECTED;
-            return DISCONNECTED;
-        }  
-        
-        if (recvall(server, (char*)&vsize, sizeof(vsize)) != 0){         //receive vsize
+        if (sv_header.type != KEY_FOUND)                             //Check if Key Found
+            return NOT_FOUND;
+
+        sv_value = (char*) malloc(sizeof(char)*(sv_header.size+1));                //allocate space for value
+        if (sv_value == NULL) {
+            recvall(server, NULL, sv_header.size);
+            return MEMORY;
+        }
+
+        if (recvall(server, sv_value, sv_header.size) != 0) {             //receive value
             connected = DISCONNECTED;
             return DISCONNECTED;
         }  
 
-        sv_value = (char*) malloc(sizeof(char)*(vsize+1));                //allocate space for value
-
-        if (recvall(server, (char*)&sv_value, vsize) != 0){             //receive value
-            connected = DISCONNECTED;
-            return DISCONNECTED;
-        }  
-
-        sv_value[vsize] = '\0';
+        sv_value[sv_header.size] = '\0';
         *value = sv_value;
-        return 1;
+        return SUCCESS;
     }
     return DISCONNECTED;
 }
 
 int delete_value(char *key)
 {
-    if(connected) {
+    if (connected) {
         size_t ksize = strlen(key);
         msgheader_t header;
         msgheader_t sv_header;

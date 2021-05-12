@@ -12,8 +12,6 @@
 #include "common.h"
 #include "list.h"
 #include "ssdict.h"
-#define MAX_KEY_SIZE 1024
-#define MAX_VALUE_SIZE 65536
 
 
 typedef struct {
@@ -126,7 +124,7 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
         return 0;
     }
 
-    //TODO: Add the key-value pair to the stored key-value pairs
+    // Add KV pair to the group's dictionary
     pthread_mutex_lock(&grouplist.mutex);
     glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);
     if (group == NULL) { 
@@ -147,8 +145,7 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
         pthread_mutex_unlock(&grouplist.mutex);
         return 1;
     }
-
-    printf("[%d] Stored the KV pair ('%s', '%s')\n", socket, key, value);
+    
     pthread_mutex_unlock(&grouplist.mutex);
 
     free(key);
@@ -161,12 +158,73 @@ int msg_put_value(int socket, msgheader_t *h, char *groupid)
     return 1;
 }
 
-int msg_get_value() 
+int msg_get_value(int socket, msgheader_t *h, char *groupid) 
+{
+    msgheader_t msg;
+    msg.size = 0;
+    msg.type = ACK;
+    char *key;
+    size_t ksize;
+
+    // Make sure the message size makes sense (has to contain at least ksize)
+    if (h->size < sizeof(ksize))
+        return 0;
+
+    if (recvall(socket, (char*)&ksize, sizeof(ksize)) != 0)
+        return 0;
+
+    if (h->size != ksize + sizeof(ksize))
+        return 0;
+
+    key = (char*) calloc(ksize+1, sizeof(char));
+    if (key == NULL) {
+        // Read all data, but ignore it and exit
+        recvall(socket, NULL, ksize);
+        msg.type = EINTERNAL;
+        sendall(socket, (char*)&msg, sizeof(msg));
+        return 1;
+    }
+
+    // Attempt to receive the key
+    if (recvall(socket, key, ksize) != 0) {
+        free(key);
+        return 0;
+    }
+    key[ksize] = '\0';
+    
+    // Get the value corresponding to the key in the group's dictionary
+    pthread_mutex_lock(&grouplist.mutex);
+    glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);
+    if (group == NULL) { 
+        // Group was deleted, notify client and close the connection
+        free(key);
+        msg.type = EGROUP_DELETED;
+        sendall(socket, (char*)&msg, sizeof(msg));
+        pthread_mutex_unlock(&grouplist.mutex);
+        return 0;
+    }
+    const char *value = ssdict_get(group->d, key);
+    pthread_mutex_unlock(&grouplist.mutex);
+
+    msg.type = value == NULL ? KEY_NOTFOUND : KEY_FOUND;
+    msg.size = value == NULL ? 0 : strlen(value);
+
+    // Send response
+    if (sendall(socket, (char*)&msg, sizeof(msg)) != 0)
+        return 0;
+    if (msg.type == KEY_FOUND) {
+        if (sendall(socket, value, msg.size) != 0)
+            return 0;
+    }
+    return 1;
+}
+
+int msg_delete_value(int socket, msgheader_t *h, char *groupid)
 {
     return 0;
 }
 
-int msg_register_callback() 
+int msg_register_callback(int socket, msgheader_t *h, char *groupid) 
 {
     return 0;
 }
@@ -245,10 +303,13 @@ void *connection_handler_thread(void *args)
                 running = msg_put_value(ta->socket, &header, groupid);
                 break;
             case GET_VALUE:
-                running = msg_get_value();
+                running = msg_get_value(ta->socket, &header, groupid);
+                break;
+            case DEL_VALUE:
+                running = msg_delete_value(ta->socket, &header, groupid);
                 break;
             case REGISTER_CALLBACK:
-                running = msg_register_callback();
+                running = msg_register_callback(ta->socket, &header, groupid);
                 break;
             case DISCONNECT:
                 running = 0;

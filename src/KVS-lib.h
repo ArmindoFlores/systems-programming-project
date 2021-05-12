@@ -2,12 +2,14 @@
 #define _KVS_LIB_
 
 typedef enum {
-    SUCCESS = 0,
+    SUCCESS = 1,
     DISCONNECTED = -1,
     UNKNOWN = -2,
     INVALID = -3,
     ALREADY_CONNECTED = -4,
-    SOCK_ERROR = -5
+    SOCK_ERROR = -5,
+    NOT_FOUND = -6,
+    MEMORY = -7
 } errors_t;
 
 int establish_connection (char *group_id, char *secret);
