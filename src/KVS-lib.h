@@ -9,7 +9,8 @@ typedef enum {
     ALREADY_CONNECTED = -4,
     SOCK_ERROR = -5,
     NOT_FOUND = -6,
-    MEMORY = -7
+    MEMORY = -7,
+    WRONG_LOGIN = -8
 } errors_t;
 
 int establish_connection (char *group_id, char *secret);

@@ -13,6 +13,9 @@
 #include "list.h"
 #include "ssdict.h"
 
+#define XSTR(a) STR(a)
+#define STR(a) #a
+
 
 typedef struct {
     char *groupid;
@@ -219,6 +222,45 @@ int msg_get_value(int socket, msgheader_t *h, char *groupid)
     return 1;
 }
 
+int create_group(char *groupid, char *secret){
+    size_t gidlen=strlen(groupid);
+    groupid[gidlen] = '\0';
+
+    glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);             
+    if (group == NULL) { // No information is stored for this group yet
+        group = (glelement_t*) malloc(sizeof(glelement_t));
+        if (group == NULL) {
+            free(groupid);
+            fprintf(stderr,"Memory error(internal error)\n");
+            return -1;
+        }
+
+        group->d = ssdict_create(16);
+        group->groupid = (char*) malloc(sizeof(char)*(gidlen+1));
+        if (group->d == NULL || group->groupid == NULL) {
+            free(group->d);
+            free(group->groupid);
+            free(groupid);
+            fprintf(stderr,"Memory error(internal error)\n");
+            return -1;
+        }
+        strcpy(group->groupid, groupid);
+        group->groupid[gidlen] = '\0';
+
+        if (ulist_pushback(grouplist.list, group) != 0) {
+            free(groupid);
+            free_glelement(group);
+            fprintf(stderr,"Memory error(internal error)\n");
+            return -1;
+        }
+
+        //send secret to authserver
+    }else{
+        return -2;
+    }
+    return 1;
+}
+
 int msg_delete_value(int socket, msgheader_t *h, char *groupid)
 {
     return 0;
@@ -254,45 +296,12 @@ void *connection_handler_thread(void *args)
     if (recvall(ta->socket, groupid, gidlen) != 0) {
         running = 0;
     }
-    else {
-        groupid[gidlen] = '\0';
-        pthread_mutex_lock(&grouplist.mutex);
-        glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);
-       
-        if (group == NULL) { // No information is stored for this group yet
-            group = (glelement_t*) malloc(sizeof(glelement_t));
-            if (group == NULL) {
-                free(groupid);
-                close(ta->socket);
-                free(ta);
-                printf("Disconnected (internal error)\n");
-                return NULL;
-            }
-            group->d = ssdict_create(16);
-            group->groupid = (char*) malloc(sizeof(char)*(gidlen+1));
-            if (group->d == NULL || group->groupid == NULL) {
-                free(group->d);
-                free(group->groupid);
-                free(groupid);
-                close(ta->socket);
-                free(ta);
-                printf("Disconnected (internal error)\n");
-                return NULL;
-            }
-            strcpy(group->groupid, groupid);
-            group->groupid[gidlen] = '\0';
-            pthread_mutex_init(&group->mutex, NULL);
-            if (ulist_pushback(grouplist.list, group) != 0) {
-                free(groupid);
-                free_glelement(group);
-                close(ta->socket);
-                free(ta);
-                printf("Disconnected (internal error)\n");
-                return NULL;
-            }
-        }
-        pthread_mutex_unlock(&grouplist.mutex);
+
+    if(ulist_find_element_if(grouplist.list, find_glelement, groupid)==NULL){ //check if group exists
+        running =0;
+        //dont accept
     }
+        
 
     msgheader_t header;
     while (running) {
@@ -361,6 +370,16 @@ void *main_listener_thread(void *args)
     }
 }
 
+
+char getOption(char* arg){
+    if(strcmp(arg, "exit")==0) return 0;
+    if(strcmp(arg, "show")==0)  return 1;
+    if(strcmp(arg, "create")==0)  return 2;
+    if(strcmp(arg, "delete")==0)  return 3;
+    if(strcmp(arg, "status")==0)  return 4;
+    return -1;
+}
+
 int main() 
 {
     // Create list of groups and dicts
@@ -380,17 +399,70 @@ int main()
     pthread_detach(main_listener);
 
     // Process user commands
-    char *line = NULL;
-    size_t size = 0;
-    while (1) {
+    char *line = NULL, groupid[1024], secret[1024], cmd[16];
+    size_t size = 0, argN;
+    char running=1;
+
+    while (running) {
         printf(">>> ");
         getline(&line, &size, stdin);
+        argN= sscanf(line, "%" STR(16) "s %" XSTR(1024) "s %" XSTR(1024) "s", &cmd, &groupid, &secret);
+        switch(getOption(cmd)){
+            case 0: //exit
+                running = 0;
+                break;
 
-        if (strncmp(line, "exit", 4) == 0)
-            break;
+            case 1: //show
+                if(argN!=2){
+                    fprintf(stderr, "show <groupid>\n");
+                    break;
+                }   
+                switch(ulist_find_element_if(grouplist.list, find_glelement, groupid) == NULL ? 0 :1){
+                    case 1:
+                        ulist_exec(grouplist.list, print_glelement, NULL); //change to print only this group
+                        break;
+                    default:
+                        printf("Group id doesnt exist\n");
+                        break;
 
-        else if (strncmp(line, "dicts", 5) == 0)
-            ulist_exec(grouplist.list, print_glelement, NULL);
+                }
+                break;
+
+            case 2: //create
+                if(argN!=3){
+                    fprintf(stderr, "create <groupid> <secret>\n");
+                    break;
+                }
+                //Create group 
+                switch(create_group(groupid,secret)){
+                    case 1:
+                        printf("Success!\n");
+                        break;
+                    case -2:
+                        printf("Group id already exists\n");
+                        break;
+                }
+
+                break;
+
+            case 3: //delete
+                if(argN!=2){
+                    fprintf(stderr, "delete <groupid>\n");
+                    break;
+                }
+                //delete secret from authserver
+                //delete all associated data
+                break;
+
+            case 4: 
+                //show for each client: PID; connection establishing time and connection close time (if not currently connected)
+
+                break;
+
+            default:
+                fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tshow <groupid> ---> Shows Secret and Key-Value pairs from groupid\n\tcreate <groupid> <secret> --> Creates Group with id <groupid> and secret <secret>\n\tdelete <groupid> ---> Deletes group with id <groupid>\n\tstatus ---> Shows application status\n\n");
+                break;
+        }
     }
 
     free(line);

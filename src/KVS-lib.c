@@ -35,6 +35,17 @@ int establish_connection (char *group_id, char *secret)
     
     if (sendall(server, group_id, gidlen) != 0)
         return DISCONNECTED;
+    char status=1; //check if connection was accepted
+
+    switch(status){
+        case 1: //success
+            break;
+        case 0: // wrong groupid/secret
+            return WRONG_LOGIN;
+            break;
+
+    }
+
 
     connected = 1;
     return SUCCESS;
