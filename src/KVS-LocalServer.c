@@ -34,7 +34,7 @@ void free_glelement(void *arg)
     glelement_t *element = (glelement_t*) arg;
     ssdict_free(element->d);
     free(element->groupid);
-    pthread_mutex_destroy(&element->mutex);
+    // pthread_mutex_destroy(&element->mutex);
     free(element);
 }
 
@@ -222,16 +222,27 @@ int msg_get_value(int socket, msgheader_t *h, char *groupid)
     return 1;
 }
 
-int create_group(char *groupid, char *secret){
-    size_t gidlen=strlen(groupid);
+int delete_group(char *groupid)
+{
+    pthread_mutex_lock(&grouplist.mutex);
+    int result = ulist_remove_if(grouplist.list, find_glelement, groupid);
+    pthread_mutex_unlock(&grouplist.mutex);
+    return !result;
+}
+
+int create_group(char *groupid, char *secret)
+{
+    size_t gidlen = strlen(groupid);
     groupid[gidlen] = '\0';
 
+    pthread_mutex_lock(&grouplist.mutex);
     glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);             
     if (group == NULL) { // No information is stored for this group yet
         group = (glelement_t*) malloc(sizeof(glelement_t));
         if (group == NULL) {
             free(groupid);
             fprintf(stderr,"Memory error(internal error)\n");
+            pthread_mutex_unlock(&grouplist.mutex);
             return -1;
         }
 
@@ -242,8 +253,10 @@ int create_group(char *groupid, char *secret){
             free(group->groupid);
             free(groupid);
             fprintf(stderr,"Memory error(internal error)\n");
+            pthread_mutex_unlock(&grouplist.mutex);
             return -1;
         }
+
         strcpy(group->groupid, groupid);
         group->groupid[gidlen] = '\0';
 
@@ -251,13 +264,17 @@ int create_group(char *groupid, char *secret){
             free(groupid);
             free_glelement(group);
             fprintf(stderr,"Memory error(internal error)\n");
+            pthread_mutex_unlock(&grouplist.mutex);
             return -1;
         }
 
         //send secret to authserver
-    }else{
+    }
+    else{
+        pthread_mutex_unlock(&grouplist.mutex);
         return -2;
     }
+    pthread_mutex_unlock(&grouplist.mutex);
     return 1;
 }
 
@@ -275,17 +292,18 @@ void *connection_handler_thread(void *args)
 {
     int running = 1;
     conn_handler_ta *ta = (conn_handler_ta*) args;
-    char *groupid = NULL;
+    char *groupid = NULL, secret[SECRET_SIZE] = "";
     size_t gidlen;
 
-    if (recvall(ta->socket, (char*)&gidlen, sizeof(gidlen)) != 0) {
+    if (recvall(ta->socket, (char*)&gidlen, sizeof(gidlen)) != 0 ||
+        gidlen > MAX_GROUPID_SIZE) {
         close(ta->socket);
         free(ta);
         printf("Disconnected\n");
         return NULL;
     }
 
-    groupid = (char*) malloc(sizeof(char)*(gidlen + 1));
+    groupid = (char*) calloc((gidlen + 1), sizeof(char));
     if (groupid == NULL) {
         close(ta->socket);
         free(ta);
@@ -293,15 +311,20 @@ void *connection_handler_thread(void *args)
         return NULL;
     }
 
-    if (recvall(ta->socket, groupid, gidlen) != 0) {
+    if (recvall(ta->socket, groupid, gidlen) != 0 ||
+        recvall(ta->socket, secret, SECRET_SIZE)) {
         running = 0;
     }
 
-    if(ulist_find_element_if(grouplist.list, find_glelement, groupid)==NULL){ //check if group exists
-        running =0;
+    if (running && ulist_find_element_if(grouplist.list, find_glelement, groupid) == NULL) { //check if group exists
+        running = 0;
         //dont accept
     }
-        
+
+    printf("Sending response...\n");
+    
+    if (sendall(ta->socket, (char*)&running, sizeof(running)) != 0)
+        running = 0;
 
     msgheader_t header;
     while (running) {
@@ -371,12 +394,13 @@ void *main_listener_thread(void *args)
 }
 
 
-char getOption(char* arg){
-    if(strcmp(arg, "exit")==0) return 0;
-    if(strcmp(arg, "show")==0)  return 1;
-    if(strcmp(arg, "create")==0)  return 2;
-    if(strcmp(arg, "delete")==0)  return 3;
-    if(strcmp(arg, "status")==0)  return 4;
+char get_option(char* arg)
+{
+    if (strcmp(arg, "exit") == 0) return 0;
+    if (strcmp(arg, "show") == 0)  return 1;
+    if (strcmp(arg, "create") == 0)  return 2;
+    if (strcmp(arg, "delete") == 0)  return 3;
+    if (strcmp(arg, "status") == 0)  return 4;
     return -1;
 }
 
@@ -399,42 +423,40 @@ int main()
     pthread_detach(main_listener);
 
     // Process user commands
-    char *line = NULL, groupid[1024], secret[1024], cmd[16];
+    char *line = NULL, groupid[1024] = "", secret[1024] = "", cmd[16] = "";
     size_t size = 0, argN;
-    char running=1;
+    char running = 1;
 
     while (running) {
         printf(">>> ");
         getline(&line, &size, stdin);
-        argN= sscanf(line, "%" STR(16) "s %" XSTR(1024) "s %" XSTR(1024) "s", &cmd, &groupid, &secret);
-        switch(getOption(cmd)){
+        argN = sscanf(line, "%" STR(16) "s %" XSTR(1024) "s %" XSTR(1024) "s", cmd, groupid, secret);
+        switch(get_option(cmd)){
             case 0: //exit
                 running = 0;
                 break;
 
             case 1: //show
-                if(argN!=2){
+                if (argN != 2) {
                     fprintf(stderr, "show <groupid>\n");
                     break;
-                }   
-                switch(ulist_find_element_if(grouplist.list, find_glelement, groupid) == NULL ? 0 :1){
-                    case 1:
-                        ulist_exec(grouplist.list, print_glelement, NULL); //change to print only this group
-                        break;
-                    default:
-                        printf("Group id doesnt exist\n");
-                        break;
-
                 }
+                glelement_t *found = NULL;
+                if ((found = ulist_find_element_if(grouplist.list, find_glelement, groupid)) != NULL) {
+                    ssdict_print(found->d);
+                    printf("\n");
+                }
+                else
+                    printf("Group not found\n");
                 break;
 
             case 2: //create
-                if(argN!=3){
+                if (argN != 3) {
                     fprintf(stderr, "create <groupid> <secret>\n");
                     break;
                 }
                 //Create group 
-                switch(create_group(groupid,secret)){
+                switch (create_group(groupid, secret)) {
                     case 1:
                         printf("Success!\n");
                         break;
@@ -442,16 +464,23 @@ int main()
                         printf("Group id already exists\n");
                         break;
                 }
-
                 break;
 
             case 3: //delete
-                if(argN!=2){
+                if (argN != 2){
                     fprintf(stderr, "delete <groupid>\n");
                     break;
                 }
                 //delete secret from authserver
                 //delete all associated data
+                switch (delete_group(groupid)) {
+                    case 1:
+                        printf("Success!\n");
+                        break;
+                    case 0:
+                        printf("Group id doesn't exists\n");
+                        break;
+                }
                 break;
 
             case 4: 

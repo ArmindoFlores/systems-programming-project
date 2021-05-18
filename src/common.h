@@ -5,6 +5,8 @@
 #define SERVER_ADDR "/tmp/KVS-local-server"
 #define MAX_KEY_SIZE 1024
 #define MAX_VALUE_SIZE 65536
+#define MAX_GROUPID_SIZE 1024
+#define SECRET_SIZE 16
 
 typedef enum {
     ACK,

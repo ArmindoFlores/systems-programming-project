@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     if (argc >= 3)
         result = establish_connection(argv[1], argv[2]);
     else
-        result = establish_connection("group1", "passsword");
+        result = establish_connection("group1", "password12345678");
 
     if (result != 1) {
         fprintf(stderr, "An error occurred while connecting (ERRNO %d)\n", result);
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     while (running) {
         printf(">>> ");
         getline(&line, &size, stdin);
-        argN= sscanf(line, "%" STR(16) "s %" XSTR(MAX_KEY_SIZE) "s %" XSTR(MAX_VALUE_SIZE) "s", &cmd, &key, &value);
+        argN = sscanf(line, "%" STR(16) "s %" XSTR(MAX_KEY_SIZE) "s %" XSTR(MAX_VALUE_SIZE) "s", &cmd, &key, &value);
         switch(getOption(cmd)){
             case 0: //exit
                 running = 0;

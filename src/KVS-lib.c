@@ -29,23 +29,29 @@ int establish_connection (char *group_id, char *secret)
     if (connect(server, (struct sockaddr *)&sv_addr, sizeof(sv_addr)) < 0)
         return DISCONNECTED;
         
-    size_t gidlen = strlen(group_id);
+    size_t gidlen = strlen(group_id), slen = strlen(secret);
     if (sendall(server, (char*)&gidlen, sizeof(gidlen)) != 0)
         return DISCONNECTED;
     
     if (sendall(server, group_id, gidlen) != 0)
         return DISCONNECTED;
-    char status=1; //check if connection was accepted
 
-    switch(status){
+    if (sendall(server, secret, slen) != 0)
+        return DISCONNECTED;
+
+    printf("Sent everything\n");
+
+    int status; //check if connection was accepted
+    if (recvall(server, (char*)&status, sizeof(status)) != 0)
+        return DISCONNECTED;
+
+    switch (status) {
         case 1: //success
             break;
         case 0: // wrong groupid/secret
             return WRONG_LOGIN;
             break;
-
     }
-
 
     connected = 1;
     return SUCCESS;
