@@ -8,7 +8,7 @@ LIBNAME = libKVS
 
 LIBFILES = src/KVS-lib.c src/list.c src/common.c
 LSRVFILES = src/KVS-LocalServer.c src/common.c src/ssdict.c src/list.c 
-ASRVFILES = 
+ASRVFILES = src/authServer.c
 
 LIBOBJS =  $(addprefix $(BINDIR)/,$(notdir $(LIBFILES:.c=.o)))
 LSRVOBJS =  $(addprefix $(BINDIR)/,$(notdir $(LSRVFILES:.c=.o)))
@@ -26,6 +26,9 @@ app: $(BINDIR)/client.o $(LIBDIR)/$(LIBNAME).so
 
 lserver: $(LSRVOBJS)
 	$(CC) -o $(BINDIR)/localserver $(LSRVOBJS) $(LFLAGS)
+
+aserver: 
+	$(CC) -o $(BINDIR)/authserver $(ASRVFILES) $(LFLAGS)
 
 .PHONY: tests
 tests:
