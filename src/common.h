@@ -19,13 +19,18 @@ typedef enum {
     EINVALID,
     EGROUP_DELETED,
     KEY_FOUND,
-    KEY_NOTFOUND
+    KEY_NOTFOUND,
+    CREATE_GROUP,
+    DEL_GROUP,
+    ERROR,
+    LOGIN
 } msgtype_t;
 
 typedef struct {
     size_t size;
     msgtype_t type;
 } __attribute__((packed)) msgheader_t;
+
 
 /*
  * Loops until exactly n bytes are read from the socket.

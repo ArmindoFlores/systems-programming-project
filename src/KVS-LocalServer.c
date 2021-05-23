@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <time.h>
 #include "KVS-LocalServer.h"
@@ -16,6 +18,7 @@
 #define XSTR(a) STR(a)
 #define STR(a) #a
 
+#define TIMEOUT 30*CLOCKS_PER_SEC
 
 typedef struct {
     char *groupid;
@@ -222,15 +225,31 @@ int msg_get_value(int socket, msgheader_t *h, char *groupid)
     return 1;
 }
 
-int delete_group(char *groupid)
+int delete_group(char *groupid,int as,struct sockaddr_in sv_addr)
 {
+    size_t gidlen=strlen(groupid);
+    char *message= (char*) malloc(sizeof(char)*gidlen+1);
+    message[0]=DEL_GROUP;
+    strncpy(message+1,groupid,gidlen);
+    char buffer[1024];
+    sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+    int n=-1;
+    socklen_t len=sizeof(sv_addr);
+    time_t before = clock();
+    while(clock()-before<TIMEOUT && n<0)
+        n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
+    if(buffer[0]==ERROR) return -2;
+    if(n<0) return -1;
+    printf("The  %s has been deleted\n",groupid);
+    free(message);
+
     pthread_mutex_lock(&grouplist.mutex);
     int result = ulist_remove_if(grouplist.list, find_glelement, groupid);
     pthread_mutex_unlock(&grouplist.mutex);
     return !result;
 }
 
-int create_group(char *groupid, char *secret)
+int create_group(char *groupid,int as,struct sockaddr_in sv_addr)
 {
     size_t gidlen = strlen(groupid);
     groupid[gidlen] = '\0';
@@ -265,10 +284,31 @@ int create_group(char *groupid, char *secret)
             free_glelement(group);
             fprintf(stderr,"Memory error(internal error)\n");
             pthread_mutex_unlock(&grouplist.mutex);
+
+
+
+
             return -1;
         }
 
-        //send secret to authserver
+        char *message= (char*) malloc(sizeof(char)*gidlen+1);
+        message[0]=CREATE_GROUP;
+        strncpy(message+1,groupid,gidlen);
+        printf("Sent message %s\n",message);
+        char buffer[1024];
+        sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+        //sendto(as, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+        int n=-1;
+        socklen_t len=sizeof(sv_addr);
+        time_t before = clock();
+        while(clock()-before<TIMEOUT && n<0)
+            n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
+        if(buffer[0]==ERROR) return -2;
+        if(n<0) return -1;
+        printf("The secret for Group %s is %s\n",groupid,buffer);
+        free(message);
+
+
     }
     else{
         pthread_mutex_unlock(&grouplist.mutex);
@@ -404,15 +444,44 @@ char get_option(char* arg)
     return -1;
 }
 
-int main() 
+int init_auth_socket(char **argv, struct sockaddr_in* sv_addr){
+
+    int s; 
+    if ((s= socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        fprintf(stderr, "Error while creating the socket\n");
+        exit(EXIT_FAILURE);
+    }
+    sv_addr->sin_family = AF_INET;
+    printf("addr=%s port=%s\n",argv[1],argv[2]);
+    sv_addr->sin_port =htons(atoi(argv[2]));
+    inet_aton(argv[1], &sv_addr->sin_addr);
+
+    char *hello ="hello";
+    sendto(s, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) sv_addr, sizeof(*sv_addr));
+
+    return s;
+
+
+
+
+}
+
+
+int main(int argc, char *argv[]) 
 {
+    if(argc<3){
+        printf("Input authserver IP address and port number\n");
+        exit(-1);
+    }
     // Create list of groups and dicts
     grouplist.list = ulist_create(free_glelement);
     pthread_mutex_init(&grouplist.mutex, NULL);
 
     // Create local socket
     int s = init_main_socket(SERVER_ADDR);
-
+    int as;
+    struct sockaddr_in sv_addr;
+    as = init_auth_socket(argv,&sv_addr);
     // Start up new thread to handle connections
     main_listener_ta args = { s };
     pthread_t main_listener;
@@ -451,18 +520,23 @@ int main()
                 break;
 
             case 2: //create
-                if (argN != 3) {
-                    fprintf(stderr, "create <groupid> <secret>\n");
+                if (argN != 2) {
+                    fprintf(stderr, "create <groupid>\n");
                     break;
                 }
+
                 //Create group 
-                switch (create_group(groupid, secret)) {
+                switch (create_group(groupid, as, sv_addr)) {
                     case 1:
                         printf("Success!\n");
+                        break;
+                    case -1:
+                        printf("Connection error\n");
                         break;
                     case -2:
                         printf("Group id already exists\n");
                         break;
+
                 }
                 break;
 
@@ -473,11 +547,11 @@ int main()
                 }
                 //delete secret from authserver
                 //delete all associated data
-                switch (delete_group(groupid)) {
+                switch (delete_group(groupid,as, sv_addr)) {
                     case 1:
                         printf("Success!\n");
                         break;
-                    case 0:
+                    case -2:
                         printf("Group id doesn't exists\n");
                         break;
                 }
@@ -489,7 +563,7 @@ int main()
                 break;
 
             default:
-                fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tshow <groupid> ---> Shows Secret and Key-Value pairs from groupid\n\tcreate <groupid> <secret> --> Creates Group with id <groupid> and secret <secret>\n\tdelete <groupid> ---> Deletes group with id <groupid>\n\tstatus ---> Shows application status\n\n");
+                fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tshow <groupid> ---> Shows Secret and Key-Value pairs from groupid\n\tcreate <groupid>  --> Creates Group with id <groupid> \n\tdelete <groupid> ---> Deletes group with id <groupid>\n\tstatus ---> Shows application status\n\n");
                 break;
         }
     }
