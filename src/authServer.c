@@ -9,6 +9,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
+#include "authServer.h"
 
 
 int init_main_socket(int port){
@@ -48,8 +50,73 @@ char* generate_secret(){
 	return secret;
 }
 
+void *handle_message_thread(void *args){
+	handle_message_ta *ta = (handle_message_ta*) args;
+	char *gid;
+	char *message;
+	struct sockaddr_in caddr=ta->client_addr;
+	switch(ta->buffer[0]){
+		case CREATE_GROUP:
+			
+			gid= (char*) malloc(sizeof(char)*ta->n-1);
 
-int main(int argc, char *argv[]) {
+			strncpy(gid,ta->buffer+1,ta->n-1);
+			gid[ta->n-1]='\0';
+			message=generate_secret();
+
+			//secret[0]=ERROR;// IF error creating;
+
+			printf("Creating Group %s with secret %s\n",gid,message);
+			//create dictionary
+
+			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
+
+			free(gid);
+			free(message);
+			
+			break;
+
+		case DEL_GROUP:
+			//Check if group exists and then delete group else return error.
+			gid= (char*) malloc(sizeof(char)*ta->n-1);
+			message= (char*) malloc(sizeof(char));
+
+			strncpy(gid,ta->buffer+1,ta->n-1);
+			//check if exists
+			gid[ta->n-1]='\0';
+			printf("Delete group %s\n",gid);
+			message[0]=ACK;
+			//message[0]=ERROR;
+			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
+			free(gid);
+			free(message);
+			break;
+
+		case LOGIN:
+			//Get secret and gid and return true if matches 0 if not
+			message= (char*) malloc(sizeof(char)*SECRET_SIZE+1);
+			gid= (char*) malloc(sizeof(char)*ta->n-1);
+			strncpy(message,ta->buffer+1,SECRET_SIZE);
+			message[16]='\0';
+			strncpy(gid,ta->buffer+SECRET_SIZE+1,ta->n-1-SECRET_SIZE);
+			printf("Login Attempt Group %s with secret %s\n",gid,message);
+			//check
+			free(message);
+			message= (char*) malloc(sizeof(char));
+			message[0]=ACK; //if Right
+			//message[0]=ERROR; //if Wrong
+			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
+			free(gid);
+			free(message);
+			break;
+
+	}
+	free(ta->buffer);
+	return NULL;
+}
+
+
+int main(int argc, char *argv[]){
 
 	if(argc <2){
 		printf("Input port number\n");
@@ -60,87 +127,35 @@ int main(int argc, char *argv[]) {
 	socket=init_main_socket(atoi(argv[1]));
 	int n, len;
 	struct sockaddr_in caddr;
-	char buffer[1024];
-	char *gid;
-	char *message;
+	char *buffer;
+	buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
 	while(1){
-		memset(&caddr, 0, sizeof(caddr));
-
 		n=recvfrom(socket, (char *)buffer, 1024,MSG_DONTWAIT, ( struct sockaddr *) &caddr, &len);
 		if(n>0){
 			buffer[n]='\0';
-			printf("client: %s size= %d: %s\n",inet_ntoa(caddr.sin_addr),n, buffer);
-			switch(buffer[0]){
+			//printf("client: %s size= %d: %s\n",inet_ntoa(caddr.sin_addr),n, buffer);
+			handle_message_ta *args = (handle_message_ta*) malloc(sizeof(handle_message_ta));
+        	if (args == NULL) {
+            	printf("Error allocating memory!\n");
+        	}
+        	args->socket = socket;
+	        args->client_addr = caddr;
+	        args->buffer = buffer;
+	        args->n=n+1;
+	        args->len=len;
 
-				case CREATE_GROUP:
-					
-					gid= (char*) malloc(sizeof(char)*n-1);
-					
-					strncpy(gid,buffer+1,n-1);
-					gid[n-1]='\0';
-					message=generate_secret();
-					//secret[0]=ERROR;// IF error creating;
-					printf("Creating Group %s with secret %s\n",gid,message);
-					//create dictionary
-
-					sendto(socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,len);
-
-
-
-					free(gid);
-					free(message);
-					
-					break;
-
-				case DEL_GROUP:
-					//Check if group exists and then delete group else return error.
-					gid= (char*) malloc(sizeof(char)*n-1);
-					message= (char*) malloc(sizeof(char));
-					strncpy(gid,buffer+1,n-1);
-					//check if exists
-					gid[n-1]='\0';
-					printf("Delete group %s\n",gid);
-					message[0]=ACK;
-					//message[0]=ERROR;
-					sendto(socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,len);
-					free(gid);
-					free(message);
-					break;
-
-				case LOGIN:
-					//Get secret and gid and return true if matches 0 if not
-					message= (char*) malloc(sizeof(char)*SECRET_SIZE+1);
-					gid= (char*) malloc(sizeof(char)*n-1);
-					strncpy(message,buffer+1,SECRET_SIZE);
-					message[16]='\0';
-					strncpy(gid,buffer+SECRET_SIZE+1,n-1-SECRET_SIZE);
-					printf("Login Attempt Group %s with secret %s\n",gid,message);
-					//check
-					free(message);
-					message= (char*) malloc(sizeof(char));
-					message[0]=ACK; //if Right
-					//message[0]=ERROR; //if Wrong
-					sendto(socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,len);
-					free(gid);
-					free(message);
-					break;
-
-				default:
-					//return invalid
-					break;
-
-
-
-
-
-			}
-
-
-
-
-
-			memset(buffer, 0, sizeof(1024));
-		}
+	        pthread_t child;
+	        if (pthread_create(&child, NULL, handle_message_thread, args) != 0) {
+	            fprintf(stderr, "Error while creating thread\n");
+	            free(args);
+	            continue;
+	        }
+	        if (pthread_detach(child) != 0) {
+	            fprintf(stderr, "Error while detaching thread\n");
+	            continue;
+	        }
+	        buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
+	   	}
 	}
 	return 0;
 }

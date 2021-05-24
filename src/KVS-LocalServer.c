@@ -296,7 +296,7 @@ int create_group(char *groupid,int as,struct sockaddr_in sv_addr)
         char *message= (char*) malloc(sizeof(char)*gidlen+1);
         message[0]=CREATE_GROUP;
         strncpy(message+1,groupid,gidlen);
-        printf("Sent message %s\n",message);
+        printf("Sent Group creation request\n");
         char buffer[1024];
         sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
         //sendto(as, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
@@ -482,12 +482,12 @@ int init_auth_socket(char **argv, struct sockaddr_in* sv_addr){
         exit(EXIT_FAILURE);
     }
     sv_addr->sin_family = AF_INET;
-    printf("addr=%s port=%s\n",argv[1],argv[2]);
+    printf("AuthServer Address=%s Port=%s\n",argv[1],argv[2]);
     sv_addr->sin_port =htons(atoi(argv[2]));
     inet_aton(argv[1], &sv_addr->sin_addr);
 
-    char *hello ="hello";
-    sendto(s, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) sv_addr, sizeof(*sv_addr));
+    //char *hello ="hello";
+    //sendto(s, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) sv_addr, sizeof(*sv_addr));
 
     return s;
 
@@ -521,9 +521,10 @@ int main(int argc, char *argv[])
     }
 
     args->socket = s;
-    printf("%d  %d\n\n",s,args->socket);
+
     args->auth_socket = as;
     args->sv_addr = sv_addr;
+
 
     pthread_t main_listener;
     if (pthread_create(&main_listener, NULL, main_listener_thread, args) != 0) {
