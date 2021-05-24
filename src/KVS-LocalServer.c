@@ -18,7 +18,7 @@
 #define XSTR(a) STR(a)
 #define STR(a) #a
 
-#define TIMEOUT 30*CLOCKS_PER_SEC
+#define TIMEOUT 5*CLOCKS_PER_SEC
 
 typedef struct {
     char *groupid;
@@ -231,21 +231,23 @@ int delete_group(char *groupid,int as,struct sockaddr_in sv_addr)
     char *message= (char*) malloc(sizeof(char)*gidlen+1);
     message[0]=DEL_GROUP;
     strncpy(message+1,groupid,gidlen);
-    char buffer[1024];
-    sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+    char buffer[1024];  
     int n=-1;
-    socklen_t len=sizeof(sv_addr);
-    time_t before = clock();
-    while(clock()-before<TIMEOUT && n<0)
-        n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
-    if(buffer[0]==ERROR) return -2;
-    if(n<0) return -1;
-    printf("The  %s has been deleted\n",groupid);
-    free(message);
 
     pthread_mutex_lock(&grouplist.mutex);
     int result = ulist_remove_if(grouplist.list, find_glelement, groupid);
     pthread_mutex_unlock(&grouplist.mutex);
+
+    if(!result){
+        sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+        free(message);
+        socklen_t len=sizeof(sv_addr);
+        time_t before = clock();
+        while(clock()-before<TIMEOUT && n<0)
+            n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
+        if(buffer[0]==ERROR) return -2;
+        if(n<0) return -1;
+    }
     return !result;
 }
 
@@ -328,6 +330,28 @@ int msg_register_callback(int socket, msgheader_t *h, char *groupid)
     return 0;
 }
 
+
+
+int login_auth(char *gid, char *secret, int as,struct sockaddr_in sv_addr){
+    char *message =(char*) malloc(strlen(gid)+16+1);
+    message[0]=LOGIN;
+    strncpy(message+1,secret,16);
+    strncpy(message+1+16,gid,strlen(gid));
+    printf("Sending login attempt %s\n",message);
+    sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+    char buffer[1024];
+    int n=-1;
+    socklen_t len=sizeof(sv_addr);
+    time_t before = clock();
+    while(clock()-before<TIMEOUT && n<0)
+        n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
+    if(buffer[0]==ERROR) return -2;
+    if(n<0) return -1;
+    
+    free(message);
+       
+    return 1;
+}
 void *connection_handler_thread(void *args)
 {
     int running = 1;
@@ -359,7 +383,11 @@ void *connection_handler_thread(void *args)
     if (running && ulist_find_element_if(grouplist.list, find_glelement, groupid) == NULL) { //check if group exists
         running = 0;
         //dont accept
+    }else if(login_auth(groupid,secret,ta->auth_socket,ta->sv_addr)!=1){
+        running= 0;
     }
+
+    
 
     printf("Sending response...\n");
     
@@ -420,6 +448,8 @@ void *main_listener_thread(void *args)
         args->socket = new_socket;
         args->client = incoming;
         args->length = length;
+        args->auth_socket = ta->auth_socket;
+        args->sv_addr = ta->sv_addr;
         pthread_t child;
         if (pthread_create(&child, NULL, connection_handler_thread, args) != 0) {
             fprintf(stderr, "Error while creating thread\n");
@@ -483,9 +513,20 @@ int main(int argc, char *argv[])
     struct sockaddr_in sv_addr;
     as = init_auth_socket(argv,&sv_addr);
     // Start up new thread to handle connections
-    main_listener_ta args = { s };
+   
+    //main_listener_ta args = { s }; 
+    main_listener_ta *args = (main_listener_ta*) malloc(sizeof(main_listener_ta));
+    if (args == NULL) {
+            printf("Error allocating memory!\n");
+    }
+
+    args->socket = s;
+    printf("%d  %d\n\n",s,args->socket);
+    args->auth_socket = as;
+    args->sv_addr = sv_addr;
+
     pthread_t main_listener;
-    if (pthread_create(&main_listener, NULL, main_listener_thread, &args) != 0) {
+    if (pthread_create(&main_listener, NULL, main_listener_thread, args) != 0) {
         fprintf(stderr, "Error while creating thread\n");
         exit(EXIT_FAILURE);
     }
@@ -551,8 +592,14 @@ int main(int argc, char *argv[])
                     case 1:
                         printf("Success!\n");
                         break;
-                    case -2:
+                    case 0:
                         printf("Group id doesn't exists\n");
+                        break;
+                    case -1:
+                        printf("Connection to auth Server failed\n");
+                        break;
+                    case -2:
+                        printf("Auth server returned error\n");
                         break;
                 }
                 break;

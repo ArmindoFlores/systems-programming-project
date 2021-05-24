@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
 					gid= (char*) malloc(sizeof(char)*n-1);
 					
 					strncpy(gid,buffer+1,n-1);
+					gid[n-1]='\0';
 					message=generate_secret();
 					//secret[0]=ERROR;// IF error creating;
 					printf("Creating Group %s with secret %s\n",gid,message);
@@ -97,7 +98,8 @@ int main(int argc, char *argv[]) {
 					message= (char*) malloc(sizeof(char));
 					strncpy(gid,buffer+1,n-1);
 					//check if exists
-					printf("Delete group %s",gid);
+					gid[n-1]='\0';
+					printf("Delete group %s\n",gid);
 					message[0]=ACK;
 					//message[0]=ERROR;
 					sendto(socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,len);
@@ -113,6 +115,11 @@ int main(int argc, char *argv[]) {
 					message[16]='\0';
 					strncpy(gid,buffer+SECRET_SIZE+1,n-1-SECRET_SIZE);
 					printf("Login Attempt Group %s with secret %s\n",gid,message);
+					//check
+					free(message);
+					message= (char*) malloc(sizeof(char));
+					message[0]=ACK; //if Right
+					//message[0]=ERROR; //if Wrong
 					sendto(socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,len);
 					free(gid);
 					free(message);
