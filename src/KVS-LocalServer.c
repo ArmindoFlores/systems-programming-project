@@ -473,7 +473,7 @@ char get_option(char* arg)
 
 int init_auth_socket(char **argv, struct sockaddr_in* sv_addr){
 
-    int s; 
+    int s,n=-1; 
     if ((s= socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         fprintf(stderr, "Error while creating the socket\n");
         exit(EXIT_FAILURE);
@@ -483,6 +483,22 @@ int init_auth_socket(char **argv, struct sockaddr_in* sv_addr){
     sv_addr->sin_port =htons(atoi(argv[2]));
     inet_aton(argv[1], &sv_addr->sin_addr);
 
+    char *message = (char*) malloc(sizeof(char));
+    message[0] = PING;
+
+    sendto(s, (const char *)message, 1, MSG_DONTWAIT, (const struct sockaddr *) sv_addr, sizeof(*sv_addr));
+    socklen_t len=sizeof(*sv_addr);
+    time_t before = clock();
+    message[0] = 123;
+    while(clock()-before<TIMEOUT && n<=0)
+        n=recvfrom(s, (char *)message, 1,MSG_DONTWAIT, ( struct sockaddr *) sv_addr, (socklen_t*)&len);
+    if(message[0]!=ACK){
+        printf("n= %d message =%d",n,(int)message[0]);
+        printf("AuthServer is offline\n");
+        exit(EXIT_FAILURE);
+    } 
+    printf("AuthServer is online\n");
+    free(message);
     //char *hello ="hello";
     //sendto(s, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) sv_addr, sizeof(*sv_addr));
 
