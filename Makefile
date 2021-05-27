@@ -8,7 +8,7 @@ LIBNAME = libKVS
 
 LIBFILES = src/KVS-lib.c src/list.c src/common.c
 LSRVFILES = src/KVS-LocalServer.c src/common.c src/ssdict.c src/list.c 
-ASRVFILES = src/authServer.c
+ASRVFILES = src/authServer.c src/ssdict.c src/list.c 
 
 LIBOBJS =  $(addprefix $(BINDIR)/,$(notdir $(LIBFILES:.c=.o)))
 LSRVOBJS =  $(addprefix $(BINDIR)/,$(notdir $(LSRVFILES:.c=.o)))

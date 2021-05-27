@@ -36,17 +36,17 @@ int init_main_socket(int port){
 
 
 char* generate_secret(){
-	char *secret= (char*) malloc(sizeof(char)*SECRET_SIZE+1);
+	char *secret = (char*) malloc(sizeof(char)*SECRET_SIZE+2);
 	time_t t;
 	srand((unsigned) time(&t));
-	for(char i =0;i<SECRET_SIZE;i++){
+	for(char i =1;i<SECRET_SIZE+1;i++){
 		if(rand()%2)
 			secret[i]=rand()%10+48; //numbers
 		else
 			secret[i]=rand()%26+97; //characters
 	}
+	secret[0]=ACK;
 	secret[SECRET_SIZE+1]='\0';
-	//printf("%s\n",secret);
 	return secret;
 }
 
@@ -58,35 +58,55 @@ void *handle_message_thread(void *args){
 	switch(ta->buffer[0]){
 		case CREATE_GROUP:
 			
-			gid= (char*) malloc(sizeof(char)*ta->n-1);
+			gid = (char*) malloc(sizeof(char)*(ta->n-1));
+			memcpy(gid, ta->buffer+1, ta->n-1);
+			gid[ta->n-2] = '\0';
+			message = generate_secret();
 
-			strncpy(gid,ta->buffer+1,ta->n-1);
-			gid[ta->n-1]='\0';
-			message=generate_secret();
-
-			//secret[0]=ERROR;// IF error creating;
-
-			printf("Creating Group %s with secret %s\n",gid,message);
-			//create dictionary
-
+			pthread_mutex_lock(&ta->dict_mutex);
+			if (ssdict_get(ta->d, gid) == NULL) {
+				if (ssdict_set(ta->d, gid, message) != 0) {
+					pthread_mutex_unlock(&ta->dict_mutex);
+					message[0] = ERROR;// IF error creating;
+					printf("Error creating group (memory error)\n");
+				}
+				else {
+					pthread_mutex_unlock(&ta->dict_mutex);
+					printf("Creating group %s with secret %s\n", gid, message+1);
+				}
+			}
+			else {
+				pthread_mutex_unlock(&ta->dict_mutex);
+				message[0] = ERROR;// IF error creating;
+				printf("Error creating group (group already exists)\n");
+			}
+			
 			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
 
 			free(gid);
 			free(message);
-			
 			break;
 
 		case DEL_GROUP:
 			//Check if group exists and then delete group else return error.
-			gid= (char*) malloc(sizeof(char)*ta->n-1);
-			message= (char*) malloc(sizeof(char));
+			gid = (char*) malloc(sizeof(char)*ta->n-1);
+			message = (char*) malloc(sizeof(char));
 
-			strncpy(gid,ta->buffer+1,ta->n-1);
+			strncpy(gid, ta->buffer+1, ta->n-1);
+			gid[ta->n-1] = '\0';
+
 			//check if exists
-			gid[ta->n-1]='\0';
-			printf("Delete group %s\n",gid);
-			message[0]=ACK;
-			//message[0]=ERROR;
+			pthread_mutex_lock(&ta->dict_mutex);
+			if (ssdict_get(ta->d, gid) == NULL) {
+				ssdict_set(ta->d, gid, NULL);
+				pthread_mutex_unlock(&ta->dict_mutex);
+				printf("Delete group %s\n", gid);
+				message[0] = ACK;
+			}
+			else {
+				pthread_mutex_unlock(&ta->dict_mutex);
+				message[0] = ERROR;
+			}
 			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
 			free(gid);
 			free(message);
@@ -94,17 +114,22 @@ void *handle_message_thread(void *args){
 
 		case LOGIN:
 			//Get secret and gid and return true if matches 0 if not
-			message= (char*) malloc(sizeof(char)*SECRET_SIZE+1);
-			gid= (char*) malloc(sizeof(char)*ta->n-1);
-			strncpy(message,ta->buffer+1,SECRET_SIZE);
-			message[16]='\0';
+			message = (char*) malloc(sizeof(char)*(SECRET_SIZE+1));
+			gid = (char*) malloc(sizeof(char)*ta->n-1);
+			strncpy(message, ta->buffer+1, SECRET_SIZE);
+			message[SECRET_SIZE] = '\0';
 			strncpy(gid,ta->buffer+SECRET_SIZE+1,ta->n-1-SECRET_SIZE);
-			printf("Login Attempt Group %s with secret %s\n",gid,message);
-			//check
+			gid[ta->n-SECRET_SIZE-1]='\0';
+			printf("Login Attempt Group %s with secret %s\n", gid, message);
+
 			free(message);
-			message= (char*) malloc(sizeof(char));
-			message[0]=ACK; //if Right
-			//message[0]=ERROR; //if Wrong
+			message = (char*) malloc(sizeof(char));
+
+			const char *value = ssdict_get(ta->d, gid);
+			if (value == NULL || strcmp(value, gid) != 0) 
+				message[0] = ERROR;
+			else message[0] = ACK;
+
 			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
 			free(gid);
 			free(message);
@@ -122,15 +147,19 @@ int main(int argc, char *argv[]){
 		printf("Input port number\n");
         exit(-1);
 	}
+
+	ssdict_t *groups = ssdict_create(16);
+	pthread_mutex_t mutex;
+	pthread_mutex_init(&mutex, NULL);
    
    	int socket;
 	socket=init_main_socket(atoi(argv[1]));
-	int n, len;
+	int n, len = 0;
 	struct sockaddr_in caddr;
 	char *buffer;
 	buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
 	while(1){
-		n=recvfrom(socket, (char *)buffer, 1024,MSG_DONTWAIT, ( struct sockaddr *) &caddr, &len);
+		n=recvfrom(socket, (char *)buffer, MAX_GROUPID_SIZE+SECRET_SIZE+1+1,MSG_DONTWAIT, ( struct sockaddr *) &caddr, (socklen_t*)&len);
 		if(n>0){
 			buffer[n]='\0';
 			//printf("client: %s size= %d: %s\n",inet_ntoa(caddr.sin_addr),n, buffer);
@@ -143,6 +172,8 @@ int main(int argc, char *argv[]){
 	        args->buffer = buffer;
 	        args->n=n+1;
 	        args->len=len;
+			args->d = groups;
+			args->dict_mutex = mutex;
 
 	        pthread_t child;
 	        if (pthread_create(&child, NULL, handle_message_thread, args) != 0) {
@@ -157,5 +188,7 @@ int main(int argc, char *argv[]){
 	        buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
 	   	}
 	}
+	ssdict_free(groups);
+	pthread_mutex_destroy(&mutex);
 	return 0;
 }

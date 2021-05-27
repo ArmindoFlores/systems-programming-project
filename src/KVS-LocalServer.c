@@ -244,14 +244,14 @@ int delete_group(char *groupid,int as,struct sockaddr_in sv_addr)
         socklen_t len=sizeof(sv_addr);
         time_t before = clock();
         while(clock()-before<TIMEOUT && n<0)
-            n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
+            n=recvfrom(as, (char *)buffer, 1024, MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
         if(buffer[0]==ERROR) return -2;
         if(n<0) return -1;
     }
     return !result;
 }
 
-int create_group(char *groupid,int as,struct sockaddr_in sv_addr)
+int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
 {
     size_t gidlen = strlen(groupid);
     groupid[gidlen] = '\0';
@@ -259,6 +259,25 @@ int create_group(char *groupid,int as,struct sockaddr_in sv_addr)
     pthread_mutex_lock(&grouplist.mutex);
     glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);             
     if (group == NULL) { // No information is stored for this group yet
+        char *message= (char*) malloc(sizeof(char)*gidlen+1);
+        message[0]=CREATE_GROUP;
+        strncpy(message+1,groupid,gidlen);
+        printf("Sent Group creation request\n");
+        char buffer[1024];
+        sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+        //sendto(as, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
+        int n=-1;
+        socklen_t len=sizeof(sv_addr);
+        time_t before = clock();
+        while(clock()-before<TIMEOUT && n<0)
+            n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
+        if(buffer[0]==ERROR) return -2;
+        if(n<0) return -1;
+        printf("The secret for Group %s is %s\n",groupid,buffer+1);
+        free(message);
+
+
+
         group = (glelement_t*) malloc(sizeof(glelement_t));
         if (group == NULL) {
             free(groupid);
@@ -286,29 +305,10 @@ int create_group(char *groupid,int as,struct sockaddr_in sv_addr)
             free_glelement(group);
             fprintf(stderr,"Memory error(internal error)\n");
             pthread_mutex_unlock(&grouplist.mutex);
-
-
-
-
             return -1;
         }
 
-        char *message= (char*) malloc(sizeof(char)*gidlen+1);
-        message[0]=CREATE_GROUP;
-        strncpy(message+1,groupid,gidlen);
-        printf("Sent Group creation request\n");
-        char buffer[1024];
-        sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
-        //sendto(as, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
-        int n=-1;
-        socklen_t len=sizeof(sv_addr);
-        time_t before = clock();
-        while(clock()-before<TIMEOUT && n<0)
-            n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
-        if(buffer[0]==ERROR) return -2;
-        if(n<0) return -1;
-        printf("The secret for Group %s is %s\n",groupid,buffer);
-        free(message);
+        
 
 
     }
@@ -330,18 +330,17 @@ int msg_register_callback(int socket, msgheader_t *h, char *groupid)
     return 0;
 }
 
-
-
-int login_auth(char *gid, char *secret, int as,struct sockaddr_in sv_addr){
-    char *message =(char*) malloc(strlen(gid)+16+1);
+int login_auth(char *gid, char *secret, int as,struct sockaddr_in sv_addr)
+{
+    char *message = (char*) malloc(strlen(gid)+16+1);
     message[0]=LOGIN;
     strncpy(message+1,secret,16);
-    strncpy(message+1+16,gid,strlen(gid));
+    strncpy(message+1+16, gid, strlen(gid));
     printf("Sending login attempt %s\n",message);
     sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
     char buffer[1024];
-    int n=-1;
-    socklen_t len=sizeof(sv_addr);
+    int n = -1;
+    socklen_t len = sizeof(sv_addr);
     time_t before = clock();
     while(clock()-before<TIMEOUT && n<0)
         n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
@@ -352,6 +351,7 @@ int login_auth(char *gid, char *secret, int as,struct sockaddr_in sv_addr){
        
     return 1;
 }
+
 void *connection_handler_thread(void *args)
 {
     int running = 1;
@@ -386,8 +386,6 @@ void *connection_handler_thread(void *args)
     }else if(login_auth(groupid,secret,ta->auth_socket,ta->sv_addr)!=1){
         running= 0;
     }
-
-    
 
     printf("Sending response...\n");
     
@@ -463,7 +461,6 @@ void *main_listener_thread(void *args)
     }
 }
 
-
 char get_option(char* arg)
 {
     if (strcmp(arg, "exit") == 0) return 0;
@@ -490,10 +487,6 @@ int init_auth_socket(char **argv, struct sockaddr_in* sv_addr){
     //sendto(s, (const char *)hello, strlen(hello), MSG_DONTWAIT, (const struct sockaddr *) sv_addr, sizeof(*sv_addr));
 
     return s;
-
-
-
-
 }
 
 
@@ -553,7 +546,7 @@ int main(int argc, char *argv[])
                     break;
                 }
                 glelement_t *found = NULL;
-                if ((found = ulist_find_element_if(grouplist.list, find_glelement, groupid)) != NULL) {
+                if ((found = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid)) != NULL) {
                     ssdict_print(found->d);
                     printf("\n");
                 }
