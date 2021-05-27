@@ -15,9 +15,15 @@ int main(int argc, char *argv[])
 {
     int result;
     if (argc >= 3)
-        result = establish_connection(argv[1], argv[2]);
-    else
-        result = establish_connection("group1", "password12345678");
+        if(strlen(argv[2])==16)
+            result = establish_connection(argv[1], argv[2]);
+        else{
+            printf("Secret has to be a 16 character string\n");
+            exit(EXIT_FAILURE);
+    }else{
+        printf("Input group id and a 16 character string\n");
+        exit(EXIT_FAILURE);
+    }
 
     if (result != 1) {
         fprintf(stderr, "An error occurred while connecting (ERRNO %d)\n", result);

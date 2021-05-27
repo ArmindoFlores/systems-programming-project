@@ -228,9 +228,11 @@ int msg_get_value(int socket, msgheader_t *h, char *groupid)
 int delete_group(char *groupid,int as,struct sockaddr_in sv_addr)
 {
     size_t gidlen=strlen(groupid);
+    groupid[gidlen]='\0';
     char *message= (char*) malloc(sizeof(char)*gidlen+1);
     message[0]=DEL_GROUP;
     strncpy(message+1,groupid,gidlen);
+    message[1+gidlen]='\0';
     char buffer[1024];  
     int n=-1;
 
@@ -243,10 +245,10 @@ int delete_group(char *groupid,int as,struct sockaddr_in sv_addr)
         free(message);
         socklen_t len=sizeof(sv_addr);
         time_t before = clock();
-        while(clock()-before<TIMEOUT && n<0)
+        while(clock()-before<TIMEOUT && n<=0)
             n=recvfrom(as, (char *)buffer, 1024, MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
         if(buffer[0]==ERROR) return -2;
-        if(n<0) return -1;
+        if(n<=0) return -1;
     }
     return !result;
 }
@@ -254,7 +256,9 @@ int delete_group(char *groupid,int as,struct sockaddr_in sv_addr)
 int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
 {
     size_t gidlen = strlen(groupid);
+    
     groupid[gidlen] = '\0';
+    printf("group : %s size = %d",groupid, gidlen);
 
     pthread_mutex_lock(&grouplist.mutex);
     glelement_t *group = (glelement_t*) ulist_find_element_if(grouplist.list, find_glelement, groupid);             
@@ -262,6 +266,7 @@ int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
         char *message= (char*) malloc(sizeof(char)*gidlen+1);
         message[0]=CREATE_GROUP;
         strncpy(message+1,groupid,gidlen);
+        message[1+gidlen]='\0';
         printf("Sent Group creation request\n");
         char buffer[1024];
         sendto(as, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
@@ -269,10 +274,10 @@ int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
         int n=-1;
         socklen_t len=sizeof(sv_addr);
         time_t before = clock();
-        while(clock()-before<TIMEOUT && n<0)
+        while(clock()-before<TIMEOUT && n<=0)
             n=recvfrom(as, (char *)buffer, 1024,MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
         if(buffer[0]==ERROR) return -2;
-        if(n<0) return -1;
+        if(n<=0) return -1;
         printf("The secret for Group %s is %s\n",groupid,buffer+1);
         free(message);
 

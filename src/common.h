@@ -9,7 +9,7 @@
 #define SECRET_SIZE 16
 
 typedef enum {
-    ACK=1,
+    ACK='1',
     PUT_VALUE,
     GET_VALUE,
     DEL_VALUE,

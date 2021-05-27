@@ -54,6 +54,7 @@ void *handle_message_thread(void *args){
 	handle_message_ta *ta = (handle_message_ta*) args;
 	char *gid;
 	char *message;
+	char *secret;
 	struct sockaddr_in caddr=ta->client_addr;
 	printf("Got connection from %s \n",inet_ntoa(caddr.sin_addr));
 	switch(ta->buffer[0]){
@@ -76,7 +77,7 @@ void *handle_message_thread(void *args){
 
 			pthread_mutex_lock(&ta->dict_mutex);
 			if (ssdict_get(ta->d, gid) == NULL) {
-				if (ssdict_set(ta->d, gid, message) != 0) {
+				if (ssdict_set(ta->d, gid, message+1) != 0) {
 					pthread_mutex_unlock(&ta->dict_mutex);
 					message[0] = ERROR;// IF error creating;
 					printf("Error creating group (memory error)\n");
@@ -107,11 +108,10 @@ void *handle_message_thread(void *args){
 
 			strncpy(gid, ta->buffer+1, ta->n-1);
 			//gid[ta->n-1] = '\0';
-			printf("group : %s\n",gid);
 
 			//check if exists
 			pthread_mutex_lock(&ta->dict_mutex);
-			if (ssdict_get(ta->d, gid) == NULL) {
+			if (ssdict_get(ta->d, gid) != NULL) {
 				ssdict_set(ta->d, gid, NULL);
 				pthread_mutex_unlock(&ta->dict_mutex);
 				printf("Deleted group %s\n", gid);
@@ -131,18 +131,20 @@ void *handle_message_thread(void *args){
 		case LOGIN:
 			//Get secret and gid and return true if matches 0 if not
 			message = (char*) malloc(sizeof(char)*(SECRET_SIZE+1));
-			gid = (char*) malloc(sizeof(char)*ta->n-SECRET_SIZE-1);
-			strncpy(message, ta->buffer+1, SECRET_SIZE);
-			message[SECRET_SIZE] = '\0';
+			gid = (char*) malloc(sizeof(char)*ta->n-SECRET_SIZE);
+			secret = (char*) malloc(sizeof(char)*SECRET_SIZE+1);
+			strncpy(secret, ta->buffer+1, SECRET_SIZE);
+			secret[SECRET_SIZE] = '\0';
 			strncpy(gid,ta->buffer+SECRET_SIZE+1,ta->n-1-SECRET_SIZE);
 			gid[ta->n-SECRET_SIZE-1]='\0';
-			printf("Login attempt group %s with secret %s\n", gid, message);
+			printf("Login attempt group %s with secret %s\n", gid, secret);
 
 			free(message);
 			message = (char*) malloc(sizeof(char));
 
 			const char *value = ssdict_get(ta->d, gid);
-			if (value == NULL || strcmp(value, gid) != 0){
+
+			if (value == NULL || strcmp(value, secret) != 0){
 				message[0] = ERROR;
 				printf("Login request failed\n");
 			}else{
@@ -151,6 +153,7 @@ void *handle_message_thread(void *args){
 			}
 
 			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
+			free(secret);
 			free(gid);
 			free(message);
 			break;
@@ -214,6 +217,7 @@ int main(int argc, char *argv[]){
 	            fprintf(stderr, "Error while detaching thread\n");
 	            continue;
 	        }
+	        n=-1;
 	        buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
 	   	}
 	}
