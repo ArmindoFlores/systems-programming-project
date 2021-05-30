@@ -11,7 +11,7 @@
 #define CLIENTID_SIZE 16
 
 typedef enum {
-    ACK,
+    ACK='1',
     PUT_VALUE,
     GET_VALUE,
     DEL_VALUE,
@@ -23,6 +23,7 @@ typedef enum {
     EGROUP_DELETED,
     KEY_FOUND,
     KEY_NOTFOUND,
+    PING,
     CREATE_GROUP,
     DEL_GROUP,
     ERROR,
