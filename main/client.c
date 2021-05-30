@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     if (argc >= 3)
         result = establish_connection(argv[1], argv[2]);
     else
-        result = establish_connection("group1", "password12345678");
+        result = establish_connection("group1", "89a1s2k3gqkkxz04");
 
     if (result != 1) {
         fprintf(stderr, "An error occurred while connecting (ERRNO %d)\n", result);

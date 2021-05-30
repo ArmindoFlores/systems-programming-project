@@ -3,10 +3,12 @@
 
 #include <stdlib.h>
 #define SERVER_ADDR "/tmp/KVS-local-server"
+#define CB_SERVER_ADDR "/tmp/KVS-callback-server"
 #define MAX_KEY_SIZE 1024
 #define MAX_VALUE_SIZE 65536
 #define MAX_GROUPID_SIZE 1024
 #define SECRET_SIZE 16
+#define CLIENTID_SIZE 16
 
 typedef enum {
     ACK,
@@ -14,6 +16,7 @@ typedef enum {
     GET_VALUE,
     DEL_VALUE,
     REGISTER_CALLBACK,
+    NOTIFY_CALLBACK,
     DISCONNECT,
     EINTERNAL,
     EINVALID,

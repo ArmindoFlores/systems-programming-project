@@ -190,7 +190,7 @@ int ssdict_set(ssdict_t *d, char *key, char *value)
     }
 }
 
-const char* ssdict_get(ssdict_t *d, char *key)
+char* ssdict_get(ssdict_t *d, char *key)
 {
     unsigned long hash = hash33(key) % d->capacity;
     sspair *pair = (sspair*) ulist_find_element_if(d->pairs[hash], find_key, (void*)key);

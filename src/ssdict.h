@@ -17,7 +17,7 @@ void ssdict_free(ssdict_t*);
  * Retrieve a value from the dictionary. If the key is not in the dictionary,
  * returns NULL.
  */
-const char *ssdict_get(ssdict_t*, char* key);
+char *ssdict_get(ssdict_t*, char* key);
 
 /*
  * If the key is in the dictionary, updates the value (if value is NULL,

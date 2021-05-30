@@ -55,9 +55,8 @@ void *handle_message_thread(void *args){
 	char *gid;
 	char *message;
 	struct sockaddr_in caddr=ta->client_addr;
-	switch(ta->buffer[0]){
+	switch(ta->buffer[0]) {
 		case CREATE_GROUP:
-			
 			gid = (char*) malloc(sizeof(char)*(ta->n-1));
 			memcpy(gid, ta->buffer+1, ta->n-1);
 			gid[ta->n-2] = '\0';
@@ -143,7 +142,7 @@ void *handle_message_thread(void *args){
 
 int main(int argc, char *argv[]){
 
-	if(argc <2){
+	if(argc < 2){
 		printf("Input port number\n");
         exit(-1);
 	}
