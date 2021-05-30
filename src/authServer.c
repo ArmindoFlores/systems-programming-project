@@ -56,15 +56,14 @@ void *handle_message_thread(void *args){
 	char *message;
 	char *secret;
 	struct sockaddr_in caddr=ta->client_addr;
-	printf("Got connection from %s \n",inet_ntoa(caddr.sin_addr));
+	printf("Got connection from %s \n", inet_ntoa(ta->client_addr.sin_addr));
 	switch(ta->buffer[0]){
 		case PING:
 			printf("Got a ping, sending pong\n");
 			message = (char*) malloc(sizeof(char));
 			message[0] = ACK;
-			sendto(ta->socket, (const char *)message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
-			while(1);
-			//free(message);
+			sendto(ta->socket, message, 1, MSG_DONTWAIT, (const struct sockaddr *) &caddr,ta->len);
+			free(message);
 			break;
 
 
@@ -169,6 +168,7 @@ void *handle_message_thread(void *args){
 
 	}
 	free(ta->buffer);
+	free(ta);
 	return NULL;
 }
 
@@ -186,8 +186,9 @@ int main(int argc, char *argv[]){
    
    	int socket;
 	socket=init_main_socket(atoi(argv[1]));
-	int n, len = 0;
+	int n;
 	struct sockaddr_in caddr;
+	size_t len = sizeof(caddr);
 	char *buffer;
 	buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
 	while(1){
@@ -198,6 +199,7 @@ int main(int argc, char *argv[]){
 			handle_message_ta *args = (handle_message_ta*) malloc(sizeof(handle_message_ta));
         	if (args == NULL) {
             	printf("Error allocating memory!\n");
+				continue;
         	}
         	args->socket = socket;
 	        args->client_addr = caddr;
