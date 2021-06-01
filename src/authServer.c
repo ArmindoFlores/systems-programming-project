@@ -69,9 +69,9 @@ void *handle_message_thread(void *args){
 
 		case CREATE_GROUP:
 			printf("Create group request\n");
-			gid = (char*) malloc(sizeof(char)*(ta->n-1));
+			gid = (char*) malloc(sizeof(char)*(ta->n));
 			memcpy(gid, ta->buffer+1, ta->n-1);
-			gid[ta->n-2] = '\0';
+			gid[ta->n-1] = '\0';
 			message = generate_secret();
 
 			pthread_mutex_lock(&ta->dict_mutex);
@@ -105,7 +105,7 @@ void *handle_message_thread(void *args){
 			gid = (char*) malloc(sizeof(char)*ta->n-1);
 			message = (char*) malloc(sizeof(char));
 
-			strncpy(gid, ta->buffer+1, ta->n-1);
+			memcpy(gid, ta->buffer+1, ta->n-1);
 			//gid[ta->n-1] = '\0';
 
 			//check if exists
@@ -132,9 +132,9 @@ void *handle_message_thread(void *args){
 			message = (char*) malloc(sizeof(char)*(SECRET_SIZE+1));
 			gid = (char*) malloc(sizeof(char)*ta->n-SECRET_SIZE);
 			secret = (char*) malloc(sizeof(char)*SECRET_SIZE+1);
-			strncpy(secret, ta->buffer+1, SECRET_SIZE);
+			memcpy(secret, ta->buffer+1, SECRET_SIZE);
 			secret[SECRET_SIZE] = '\0';
-			strncpy(gid,ta->buffer+SECRET_SIZE+1,ta->n-1-SECRET_SIZE);
+			memcpy(gid,ta->buffer+SECRET_SIZE+1,ta->n-1-SECRET_SIZE);
 			gid[ta->n-SECRET_SIZE-1]='\0';
 			printf("Login attempt group %s with secret %s\n", gid, secret);
 
@@ -190,11 +190,12 @@ int main(int argc, char *argv[]){
 	struct sockaddr_in caddr;
 	size_t len = sizeof(caddr);
 	char *buffer;
-	buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1));
+	buffer= (char*) malloc(sizeof(char)*(MAX_GROUPID_SIZE+SECRET_SIZE+1+1+1));
 	while(1){
-		n=recvfrom(socket, (char *)buffer, MAX_GROUPID_SIZE+SECRET_SIZE+1+1,MSG_DONTWAIT, ( struct sockaddr *) &caddr, (socklen_t*)&len);
+		n=recvfrom(socket, buffer, MAX_GROUPID_SIZE+SECRET_SIZE+1+1,MSG_DONTWAIT, ( struct sockaddr *) &caddr, (socklen_t*)&len);
 		if(n>0){
 			buffer[n]='\0';
+			printf("buffer: %s (n: %d)\n", buffer+1, n);
 			//printf("client: %s size= %d: %s\n",inet_ntoa(caddr.sin_addr),n, buffer);
 			handle_message_ta *args = (handle_message_ta*) malloc(sizeof(handle_message_ta));
         	if (args == NULL) {
