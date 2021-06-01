@@ -11,7 +11,6 @@ typedef struct {
 
 typedef struct {
     int socket;
-    struct sockaddr_un client;
     socklen_t length;
     int auth_socket;
     struct sockaddr_in sv_addr;

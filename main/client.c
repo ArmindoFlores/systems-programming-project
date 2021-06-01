@@ -11,6 +11,11 @@
 
 char getOption(char* arg);
 
+void callback1(char *value)
+{
+    printf("OMG the value changed to '%s'\n", value);
+}
+
 int main(int argc, char *argv[]) 
 {
     int result;
@@ -28,6 +33,14 @@ int main(int argc, char *argv[])
     if (result != 1) {
         fprintf(stderr, "An error occurred while connecting (ERRNO %d)\n", result);
         return 1;
+    }
+
+    if (put_value("name", "francisco") != 1) {
+        printf("ERROR\n");
+        exit(EXIT_FAILURE);
+    }
+    if ((result = register_callback("name", callback1)) != 1) {
+        printf("Error registering callback (%d)\n", result);
     }
 
     // Process user commands
