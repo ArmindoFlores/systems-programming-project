@@ -916,6 +916,7 @@ int main(int argc, char *argv[])
         printf("Input authserver IP address and port number\n");
         exit(EXIT_FAILURE);
     }
+
     // Create list of groups and dicts
     grouplist.list = ulist_create(free_glelement);
     pthread_mutex_init(&grouplist.mutex, NULL);

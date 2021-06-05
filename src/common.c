@@ -31,7 +31,7 @@ int sendall(int socket, const char *buffer, size_t n)
 {
     size_t total = 0;
     while (total < n) {
-        ssize_t sent = send(socket, buffer + total, (n - total), 0);
+        ssize_t sent = send(socket, buffer + total, (n - total), MSG_NOSIGNAL);
         if (sent == -1) // An error occurred
             return errno;
         else if (sent == 0) // Client disconnected
