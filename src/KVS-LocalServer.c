@@ -66,10 +66,6 @@ typedef struct {
 static int main_socket, callback_socket, auth_socket;
 static struct sockaddr_in sv_addr;
 
-void print_client(const void *s)
-{
-    for (int i = 0; i < CLIENTID_SIZE; i++) printf("%02x", (unsigned char) ((const char *) s)[i]);
-}
 
 void print_ilelement(const void *e)
 {
@@ -127,16 +123,6 @@ int find_glelement(const void *element, void *arg) { return strcmp(((glelement_t
 int find_addr(const void *element, void *arg) { return memcmp(((cbelement_t *) element)->clientid, (char *) arg, CLIENTID_SIZE) == 0; }
 
 int find_cidstr(const void *element, void *arg) { return memcmp((const char *) element, (char *) arg, CLIENTID_SIZE) == 0; }
-
-int find_kvpair(const void *element, void *arg) { return strcmp(((kvpair *) element)->key, (char *) arg) == 0; }
-
-void print_glelement(void *arg, void *ignore)
-{
-    glelement_t *element = (glelement_t *) arg;
-    printf("%s -> ", element->groupid);
-    ssdict_print(element->d);
-    printf("\n");
-}
 
 void get_client_secret(char *secret, int pid)
 {
