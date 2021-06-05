@@ -170,6 +170,13 @@ int init_AF_UNIX_socket(char *sock_path)
     return s;
 }
 
+void remove_client(void *element, void *args)
+{
+    cbclient_t *e = (cbclient_t*) element;
+    char *clientid = (char*) args;
+    ulist_remove_if(e->list, find_cidstr, clientid);
+}
+
 void send_callback_msg(void *element, void *args)
 {
     kvpair *pair = (kvpair *) args;
@@ -767,9 +774,11 @@ void *connection_handler_thread(void *args)
         }
     }
 
-    pthread_mutex_lock(&callbacklist.mutex);
-    ulist_remove_if(callbacklist.list, find_addr, clientid);
-    pthread_mutex_unlock(&callbacklist.mutex);
+    pthread_mutex_lock(&grouplist.mutex);
+    glelement_t *gel = (glelement_t *) ulist_find_element_if(grouplist.list, find_glelement, groupid);
+    if (gel != NULL)
+        ulist_exec(gel->callbacks, remove_client, clientid);
+    pthread_mutex_unlock(&grouplist.mutex);
 
     pthread_mutex_lock(&infolist.mutex);
     info = (ilelement_t*) ulist_find_element_if(infolist.list, find_ilelement, &pid);
