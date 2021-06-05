@@ -64,21 +64,21 @@ void *callback_thread(void *args)
             break;
         if (recvall(callback_sock, (char*) &vsize, sizeof(vsize)) != 0)
             break;
-        if (ksize == 0 || vsize == 0 || ksize >= MAX_KEY_SIZE || vsize >= MAX_VALUE_SIZE)
+        if (ksize <= 0 || vsize < 0 || ksize >= MAX_KEY_SIZE || vsize >= MAX_VALUE_SIZE)
             continue;
 
         printf("Sizes: (%lu, %lu)\n", ksize, vsize);
 
         key = (char*) calloc(ksize+1, sizeof(char));
-        value = (char*) calloc(vsize+1, sizeof(char));
-        if (key == NULL || value == NULL) {
+        if (vsize != 0) value = (char*) calloc(vsize+1, sizeof(char));
+        if (key == NULL || (vsize != 0 && value == NULL)) {
             free(key);
-            free(value);
+            if (vsize != 0) free(value);
             continue;
         }
         if (recvall(callback_sock, key, ksize) != 0) 
             break;
-        if (recvall(callback_sock, value, vsize) != 0)
+        if (vsize != 0 && (recvall(callback_sock, value, vsize) != 0))
             break;
 
         printf("{%s, %s}\n", key, value);
@@ -380,7 +380,9 @@ int register_callback(char *key, void (*callback_function)(char *))
         }  
 
         if (sv_header.type != ACK)                             //Check if Key Found
-            return ERROR;
+            return INVALID;
+
+        printf("Adding callback...\n");
 
         pthread_mutex_lock(&callbacks_mutex);
         func_cb *f = (func_cb*) malloc(sizeof(func_cb));
@@ -390,7 +392,7 @@ int register_callback(char *key, void (*callback_function)(char *))
         result = ulist_pushback(callbacks, f);
         pthread_mutex_unlock(&callbacks_mutex);
         if (result != 0)
-            return ERROR;
+            return INVALID;
         
         return SUCCESS;
     }

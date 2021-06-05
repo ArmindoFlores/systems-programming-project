@@ -13,7 +13,10 @@ char getOption(char* arg);
 
 void callback1(char *value)
 {
-    printf("OMG the value changed to '%s'\n", value);
+    if (value != NULL)
+        printf("OMG the value changed to '%s'\n", value);
+    else
+        printf("OMG the value was deleted\n");
 }
 
 int main(int argc, char *argv[]) 
