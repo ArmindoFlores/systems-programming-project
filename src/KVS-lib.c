@@ -42,19 +42,14 @@ void *callback_thread(void *args)
     size_t ksize, vsize;
     char *key = NULL, *value = NULL;
 
-    printf("Started callback thread\n");
     while (connected) {
         if (recvall(callback_sock, (char *) &header, sizeof(header)) != 0) break;
-
-        printf("Received callback\n");
 
         if (header.type != NOTIFY_CALLBACK) continue;
         if (header.size < sizeof(ksize) + sizeof(vsize)) continue;
         if (recvall(callback_sock, (char *) &ksize, sizeof(ksize)) != 0) break;
         if (recvall(callback_sock, (char *) &vsize, sizeof(vsize)) != 0) break;
         if (ksize <= 0 || vsize < 0 || ksize >= MAX_KEY_SIZE || vsize >= MAX_VALUE_SIZE) continue;
-
-        printf("Sizes: (%lu, %lu)\n", ksize, vsize);
 
         key = (char *) calloc(ksize + 1, sizeof(char));
         if (vsize != 0) value = (char *) calloc(vsize + 1, sizeof(char));
@@ -65,8 +60,6 @@ void *callback_thread(void *args)
         }
         if (recvall(callback_sock, key, ksize) != 0) break;
         if (vsize != 0 && (recvall(callback_sock, value, vsize) != 0)) break;
-
-        printf("{%s, %s}\n", key, value);
 
         pthread_mutex_lock(&callbacks_mutex);
         func_cb *f = (func_cb *) ulist_find_element_if(callbacks, find_funccb, key);
@@ -89,7 +82,6 @@ int establish_connection(char *group_id, char *secret)
     if (connected) return ALREADY_CONNECTED;
 
     char pid[32] = "", csecret[CLIENTID_SIZE];
-    sprintf(pid, "%d", getpid());
 
     server = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server == -1) return SOCK_ERROR;
@@ -370,8 +362,6 @@ int register_callback(char *key, void (*callback_function)(char *))
             return DISCONNECTED;
         }
 
-        printf("Sent all data, receiving...\n");
-
         if (recvall(server, (char *) &sv_header, sizeof(header)) != 0) { // receive sv_header
             connected = DISCONNECTED;
             return DISCONNECTED;
@@ -379,8 +369,6 @@ int register_callback(char *key, void (*callback_function)(char *))
 
         if (sv_header.type != ACK) // Check if Key Found
             return INVALID;
-
-        printf("Adding callback...\n");
 
         pthread_mutex_lock(&callbacks_mutex);
         func_cb *f = (func_cb *) malloc(sizeof(func_cb));
@@ -399,15 +387,21 @@ int register_callback(char *key, void (*callback_function)(char *))
 int close_connection()
 {
     if (connected) {
+        connected = 0;
         msgheader_t header;
         header.type = DISCONNECT;
         header.size = 0;
 
         if (sendall(server, (char *) &header, sizeof(header)) != 0) return DISCONNECTED;
 
+        shutdown(server, SHUT_RDWR);
+        shutdown(callback_sock, SHUT_RDWR);
         close(server);
         close(callback_sock);
         pthread_join(cbt, NULL);
+
+        ulist_free(callbacks);
+        pthread_mutex_destroy(&callbacks_mutex);
         return SUCCESS;
     }
     return DISCONNECTED;
