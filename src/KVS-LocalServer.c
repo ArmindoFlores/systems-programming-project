@@ -915,6 +915,8 @@ int main(int argc, char *argv[])
     while (running) {
         printf(">>> ");
         getline(&line, &size, stdin);
+        printf("\33[2K\r");
+
         argN = sscanf(line, "%" STR(16) "s %" XSTR(1024) "s %" XSTR(1024) "s", cmd, groupid, secret);
         switch (get_option(cmd)) {
         case 0: // exit
@@ -966,7 +968,7 @@ int main(int argc, char *argv[])
                 printf("Success!\n");
                 break;
             case 0:
-                printf("Group id doesn't exist locally\n");
+                printf("Group doesn't exist locally\n");
                 break;
             case -1:
                 printf("Connection to Auth Server failed\n");
