@@ -100,7 +100,7 @@ void *handle_message_thread(void *args)
         // Check if group exists and then delete group else return error.
         printf("Delete group request\n");
         gid = (char *) malloc(sizeof(char) * ta->n - 1);
-        message = (char *) malloc(sizeof(char));
+        message = (char *) malloc(sizeof(char)*2);
 
         memcpy(gid, ta->buffer + 1, ta->n - 1);
         // gid[ta->n-1] = '\0';
@@ -117,7 +117,8 @@ void *handle_message_thread(void *args)
             message[0] = ERROR;
             printf("Delete group request failed\n");
         }
-        sendto(ta->socket, (const char *) message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
+        message[1]='\0';
+        sendto(ta->socket, (const char *) message, strlen(message)+1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
         free(gid);
         free(message);
         break;
@@ -145,8 +146,9 @@ void *handle_message_thread(void *args)
             message[0] = ACK;
             printf("Login request succeeded\n");
         }
+        message[1]='\0';
 
-        sendto(ta->socket, (const char *) message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
+        sendto(ta->socket, (const char *) message, strlen(message)+1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
         free(secret);
         free(gid);
         free(message);

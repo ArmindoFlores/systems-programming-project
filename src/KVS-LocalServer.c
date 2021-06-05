@@ -34,6 +34,12 @@ typedef struct {
 } cbelement_t;
 
 typedef struct {
+    int pid;
+    time_t connect, close;
+    int closed;
+} ilelement_t;
+
+typedef struct {
     ulist_t *list;
     char *key;
 } cbclient_t;
@@ -42,6 +48,11 @@ static struct cbl {
     ulist_t *list;
     pthread_mutex_t mutex;
 } callbacklist;
+
+static struct infol {
+    ulist_t *list;
+    pthread_mutex_t mutex;
+} infolist;
 
 static struct gl {
     ulist_t *list;
@@ -60,7 +71,30 @@ void print_client(const void *s)
     for (int i = 0; i < CLIENTID_SIZE; i++) printf("%02x", (unsigned char) ((const char *) s)[i]);
 }
 
+void print_ilelement(const void *e)
+{
+    char time[256] = "";
+    struct tm *time_s;
+    ilelement_t *info = (ilelement_t*) e;
+    
+    time_s = localtime(&info->connect);
+    strftime(time, sizeof(time), "%x - %T", time_s);
+    printf("<PID=%d (CONNECTED AT %s", info->pid, time);
+    if (info->closed) {
+        time_s = localtime(&info->close);
+        strftime(time, sizeof(time), "%x - %T", time_s);
+        printf(" | DISCONNECTED AT %s", time);
+    }
+    printf(")>");
+}
+
 int find_client(const void *element, void *arg) { return strcmp(((cbclient_t *) element)->key, (char *) arg) == 0; }
+
+int find_ilelement(const void *element, void *arg) {
+    ilelement_t *info = (ilelement_t*) element;
+    int pid = *((int*) arg);
+    return info->pid == pid && info->closed == 0;
+}
 
 void free_glelement(void *arg)
 {
@@ -102,6 +136,12 @@ void print_glelement(void *arg, void *ignore)
     printf("%s -> ", element->groupid);
     ssdict_print(element->d);
     printf("\n");
+}
+
+void get_client_secret(char *secret, int pid)
+{
+    srand(time(NULL) ^ pid);
+    for (int i = 0; i < CLIENTID_SIZE; i++) secret[i] = rand() % 256;
 }
 
 int init_AF_UNIX_socket(char *sock_path)
@@ -315,6 +355,8 @@ int msg_get_value(int socket, msgheader_t *h, char *groupid)
     msg.type = value == NULL ? KEY_NOTFOUND : KEY_FOUND;
     msg.size = value == NULL ? 0 : strlen(value);
 
+    free(key);
+
     // Send response
     if (sendall(socket, (char *) &msg, sizeof(msg)) != 0) return 0;
     if (msg.type == KEY_FOUND) {
@@ -492,7 +534,7 @@ int delete_group(char *groupid, int as, struct sockaddr_in sv_addr)
     size_t gidlen = strlen(groupid);
 
     groupid[gidlen] = '\0';
-    message = (char *) malloc(sizeof(char) * gidlen + 1);
+    message = (char *) malloc(sizeof(char) *( gidlen + 1+1));
     message[0] = DEL_GROUP;
     strncpy(message + 1, groupid, gidlen);
     message[1 + gidlen] = '\0';
@@ -532,10 +574,12 @@ int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
         while (clock() - before < TIMEOUT && n <= 0) n = recvfrom(as, (char *) buffer, 1024, MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
         if (buffer[0] == ERROR) {
             free(message);
+            pthread_mutex_unlock(&grouplist.mutex);
             return -2;
         }
         if (n <= 0) {
             free(message);
+            pthread_mutex_unlock(&grouplist.mutex);
             return -1;
         }
 
@@ -593,17 +637,18 @@ int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
 
 int login_auth(char *gid, char *secret, int as, struct sockaddr_in sv_addr)
 {
-    char *message = (char *) malloc(strlen(gid) + 16 + 1 + 1);
+    char *message = (char *) malloc(strlen(gid) + SECRET_SIZE + 1 + 1);
     message[0] = LOGIN;
-    message[strlen(gid) + 16 + 1] = '\0';
-    memcpy(message + 1, secret, 16);
-    memcpy(message + 1 + 16, gid, strlen(gid));
-    printf("Sending login attempt %s\n", message + 1);
+    message[strlen(gid) + SECRET_SIZE + 1] = '\0';
+    memcpy(message + 1, secret, SECRET_SIZE);
+    memcpy(message + 1 + SECRET_SIZE, gid, strlen(gid));
+    printf("Sending login attempt (%s)\n", message+1);
     sendto(as, (const char *) message, strlen(message + 1) + 1, MSG_DONTWAIT, (const struct sockaddr *) &sv_addr, sizeof(sv_addr));
     char buffer[1024];
     int n = -1;
     socklen_t len = sizeof(sv_addr);
     time_t before = clock();
+    buffer[0] = ERROR;
     while (clock() - before < TIMEOUT && n < 0) n = recvfrom(as, (char *) buffer, 1024, MSG_DONTWAIT, (struct sockaddr *) &sv_addr, &len);
     if (buffer[0] == ERROR) return -2;
     if (n < 0) return -1;
@@ -617,8 +662,11 @@ void *connection_handler_thread(void *args)
 {
     int running = 1;
     conn_handler_ta *ta = (conn_handler_ta *) args;
-    char *groupid = NULL, secret[SECRET_SIZE] = "", clientid[CLIENTID_SIZE];
-    size_t gidlen;
+    char *groupid = NULL, secret[SECRET_SIZE] = "", clientid[CLIENTID_SIZE] = "";
+    size_t gidlen, pidlen;
+    char pidstr[MAX_PID_SIZE + 1];
+    int pid;
+    ilelement_t *info;
 
     if (recvall(ta->socket, (char *) &gidlen, sizeof(gidlen)) != 0 || gidlen > MAX_GROUPID_SIZE) {
         close(ta->socket);
@@ -626,6 +674,15 @@ void *connection_handler_thread(void *args)
         printf("Disconnected\n");
         return NULL;
     }
+
+    if (recvall(ta->socket, (char *) &pidlen, sizeof(pidlen)) != 0 || pidlen > MAX_PID_SIZE) {
+        close(ta->socket);
+        free(ta);
+        printf("Disconnected\n");
+        return NULL;
+    }
+
+    printf("Got GIDLEN and PIDLEN (%lu, %lu)\n", gidlen, pidlen);
 
     groupid = (char *) calloc((gidlen + 1), sizeof(char));
     if (groupid == NULL) {
@@ -635,17 +692,25 @@ void *connection_handler_thread(void *args)
         return NULL;
     }
 
-    if (recvall(ta->socket, groupid, gidlen) != 0 || recvall(ta->socket, secret, SECRET_SIZE)) {
+    if (recvall(ta->socket, groupid, gidlen) != 0 || 
+        recvall(ta->socket, pidstr, pidlen) != 0 ||
+        recvall(ta->socket, secret, SECRET_SIZE) != 0)
         running = 0;
-    }
 
-    if (recvall(ta->socket, clientid, CLIENTID_SIZE) != 0) running = 0;
+    pidstr[pidlen] = '\0';
+    groupid[gidlen] = '\0';
+
+    printf("Received groupid and pid (%s, %s)\n", groupid, pidstr);
+
+    pid = atoi(pidstr);
+    get_client_secret(clientid, pid);
 
     if (running && ulist_find_element_if(grouplist.list, find_glelement, groupid) == NULL) { // check if group exists
         printf("Search failed\n");
         running = 0;
         // dont accept
-    } else if (login_auth(groupid, secret, auth_socket, sv_addr) != 1) {
+    } 
+    else if (login_auth(groupid, secret, auth_socket, sv_addr) != 1) {
         printf("Login failed\n");
         running = 0;
     }
@@ -654,7 +719,28 @@ void *connection_handler_thread(void *args)
     for (int i = 0; i < CLIENTID_SIZE; i++) printf("%02x", (unsigned char) clientid[i]);
     printf("\nSending response...\n");
 
-    if (sendall(ta->socket, (char *) &running, sizeof(running)) != 0) running = 0;
+    msgheader_t response;
+    if (!running) {
+        response.size = 0;
+        response.type = EINVALID;
+    }
+    else {
+        response.size = CLIENTID_SIZE;
+        response.type = ACK;
+    }
+    if (sendall(ta->socket, (char *) &response, sizeof(response)) != 0) running = 0;
+    if (running && sendall(ta->socket, clientid, CLIENTID_SIZE) != 0) running = 0;
+
+    info = (ilelement_t*) malloc(sizeof(ilelement_t));
+    info->closed = 0;
+    info->close = 0;
+    info->connect = time(NULL);
+    info->pid = pid;
+
+    pthread_mutex_lock(&infolist.mutex);
+    int result = ulist_pushback(infolist.list, info);
+    pthread_mutex_unlock(&infolist.mutex);
+    if (result != 0) running = 0;
 
     msgheader_t header;
     while (running) {
@@ -684,6 +770,14 @@ void *connection_handler_thread(void *args)
     pthread_mutex_lock(&callbacklist.mutex);
     ulist_remove_if(callbacklist.list, find_addr, clientid);
     pthread_mutex_unlock(&callbacklist.mutex);
+
+    pthread_mutex_lock(&infolist.mutex);
+    info = (ilelement_t*) ulist_find_element_if(infolist.list, find_ilelement, &pid);
+    if (info != NULL) {
+        info->closed = 1;
+        info->close = time(NULL);
+    }
+    pthread_mutex_unlock(&infolist.mutex);
 
     free(groupid);
     close(ta->socket);
@@ -829,6 +923,9 @@ int main(int argc, char *argv[])
     callbacklist.list = ulist_create(free_cbelement);
     pthread_mutex_init(&callbacklist.mutex, NULL);
 
+    infolist.list = ulist_create(free);
+    pthread_mutex_init(&infolist.mutex, NULL);
+
     // Create sockets
     main_socket = init_AF_UNIX_socket(SERVER_ADDR);
     callback_socket = init_AF_UNIX_socket(CB_SERVER_ADDR);
@@ -921,19 +1018,27 @@ int main(int argc, char *argv[])
 
         case 4:
             // show for each client: PID; connection establishing time and connection close time (if not currently connected)
-            ulist_print(callbacklist.list, print_cblist);
+            ulist_print(infolist.list, print_ilelement);
             printf("\n");
             break;
 
         default:
-            fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tshow <groupid> ---> Shows Secret and Key-Value pairs from groupid\n\tcreate <groupid>  --> "
+            fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tshow <groupid> ---> Shows Secret and Key-Value pairs from groupid\n\tcreate <groupid>  ---> "
                             "Creates Group with id <groupid> \n\tdelete <groupid> ---> Deletes group with id <groupid>\n\tstatus ---> Shows application "
                             "status\n\n");
             break;
         }
+        cmd[0]='\0';
     }
 
     free(line);
-    pthread_mutex_destroy(&grouplist.mutex);
-    ulist_free(grouplist.list);
+    //? Can't figure out a way to free these without causing an error in the threads
+    //? We could, of course, stop the threads first and then do this, but that would
+    //? require signaling a recv() to end
+    // pthread_mutex_destroy(&grouplist.mutex);
+    // pthread_mutex_destroy(&callbacklist.mutex);
+    // pthread_mutex_destroy(&infolist.mutex);
+    // ulist_free(grouplist.list);
+    // ulist_free(callbacklist.list);
+    // ulist_free(infolist.list);
 }

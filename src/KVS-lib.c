@@ -36,12 +36,6 @@ int find_funccb(const void *element, void *arg)
     return strcmp(f->key, (char *) arg) == 0;
 }
 
-void get_client_secret(char *secret)
-{
-    srand(time(NULL) ^ getpid());
-    for (int i = 0; i < CLIENTID_SIZE; i++) secret[i] = rand() % 256;
-}
-
 void *callback_thread(void *args)
 {
     msgheader_t header;
@@ -91,10 +85,11 @@ void *callback_thread(void *args)
 
 int establish_connection(char *group_id, char *secret)
 {
+    if (strlen(secret) != SECRET_SIZE) return WRONG_LOGIN;
     if (connected) return ALREADY_CONNECTED;
 
-    char csecret[CLIENTID_SIZE];
-    get_client_secret(csecret);
+    char pid[32] = "", csecret[CLIENTID_SIZE];
+    sprintf(pid, "%d", getpid());
 
     server = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server == -1) return SOCK_ERROR;
@@ -107,8 +102,13 @@ int establish_connection(char *group_id, char *secret)
         return DISCONNECTED;
     }
 
-    size_t gidlen = strlen(group_id), slen = strlen(secret);
+    size_t gidlen = strlen(group_id), pidlen = strlen(pid);
     if (sendall(server, (char *) &gidlen, sizeof(gidlen)) != 0) {
+        close(server);
+        return DISCONNECTED;
+    }
+
+    if (sendall(server, (char *) &pidlen, sizeof(pidlen)) != 0) {
         close(server);
         return DISCONNECTED;
     }
@@ -118,29 +118,39 @@ int establish_connection(char *group_id, char *secret)
         return DISCONNECTED;
     }
 
-    if (sendall(server, secret, slen) != 0) {
+    if (sendall(server, pid, pidlen) != 0) {
         close(server);
         return DISCONNECTED;
     }
 
-    if (sendall(server, csecret, CLIENTID_SIZE) != 0) {
+    if (sendall(server, secret, SECRET_SIZE) != 0) {
         close(server);
         return DISCONNECTED;
     }
 
-    int status; // check if connection was accepted
+    msgheader_t status; // check if connection was accepted
     if (recvall(server, (char *) &status, sizeof(status)) != 0) {
         close(server);
         return DISCONNECTED;
     }
 
-    switch (status) {
-    case 1: // success
+    switch (status.type) {
+    case ACK: // success
         break;
-    case 0: // wrong groupid/secret
+    default: // wrong groupid/secret
         close(server);
         return WRONG_LOGIN;
         break;
+    }
+
+    if (status.size != CLIENTID_SIZE) {
+        close(server);
+        return UNKNOWN;
+    }
+
+    if (recvall(server, csecret, CLIENTID_SIZE) != 0) {
+        close(server);
+        return DISCONNECTED;
     }
 
     // Create callback related variables
