@@ -6,7 +6,7 @@ SRCDIR = src
 LIBDIR = lib
 LIBNAME = libKVS
 
-LIBFILES = src/KVS-lib.c src/list.c src/common.c src/ssdict.c
+LIBFILES = src/KVS-lib.c src/list.c src/common.c
 LSRVFILES = src/KVS-LocalServer.c src/common.c src/ssdict.c src/list.c 
 ASRVFILES = src/authServer.c src/ssdict.c src/list.c 
 
@@ -17,12 +17,15 @@ HEADERS = $(wildcard $(SRCDIR)/*.h)
 
 VPATH = main:src
 
-all: lib app lserver aserver
+all: lib demo1 lserver aserver
 	
 lib: $(LIBDIR)/$(LIBNAME).so
 
-app: $(BINDIR)/client.o $(LIBDIR)/$(LIBNAME).so
+demo1: $(BINDIR)/client.o $(LIBDIR)/$(LIBNAME).so
 	$(CC) -o $(BINDIR)/client $< $(LIBDIR)/$(LIBNAME).so $(LFLAGS)
+
+demo2: $(BINDIR)/chat_demo.o $(LIBDIR)/$(LIBNAME).so
+	$(CC) -o $(BINDIR)/chat $< $(LIBDIR)/$(LIBNAME).so $(LFLAGS) -lncurses
 
 lserver: $(LSRVOBJS)
 	$(CC) -o $(BINDIR)/localserver $(LSRVOBJS) $(LFLAGS)
