@@ -11,27 +11,27 @@ ssdict_t *ssdict_create(int capacity);
 /*
  * Frees all memory allocated by an ssdict_t
  */
-void ssdict_free(ssdict_t*);
+void ssdict_free(ssdict_t *);
 
 /*
  * Retrieve a value from the dictionary. If the key is not in the dictionary,
  * returns NULL.
  */
-char *ssdict_get(ssdict_t*, char* key);
+char *ssdict_get(ssdict_t *, char *key);
 
 /*
  * If the key is in the dictionary, updates the value (if value is NULL,
  * the item is deleted).
- * Otherwise, adds an item (key, value) to the dictionary. 
+ * Otherwise, adds an item (key, value) to the dictionary.
  * Returns 0 upon sucess, 1 otherwise.
  */
-int ssdict_set(ssdict_t*, char* key, char* value);
+int ssdict_set(ssdict_t *, char *key, char *value);
 
 /*
- * Resizes an existing dictionary. This is done by creating a new one and 
+ * Resizes an existing dictionary. This is done by creating a new one and
  * copying & rehashing all elements. Returns 0 if successfull, 1 otherwise.
  */
-int ssdict_resize(ssdict_t*, int capacity);
+int ssdict_resize(ssdict_t *, int capacity);
 
 /*
  * Prints every element inside a dictionary in the following format:
@@ -40,6 +40,6 @@ int ssdict_resize(ssdict_t*, int capacity);
  *      "second_key": "second_value",
  * }
  */
-void ssdict_print(const ssdict_t*);
+void ssdict_print(const ssdict_t *);
 
 #endif

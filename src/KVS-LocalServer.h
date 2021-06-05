@@ -2,6 +2,7 @@
 #define _KVS_LOCALSERVER_
 
 #include <sys/socket.h>
+#include <netinet/in.h>
 
 typedef struct {
     int socket;

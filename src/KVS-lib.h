@@ -13,7 +13,7 @@ typedef enum {
     WRONG_LOGIN = -8
 } errors_t;
 
-int establish_connection (char *group_id, char *secret);
+int establish_connection(char *group_id, char *secret);
 int put_value(char *key, char *value);
 int get_value(char *key, char **value);
 int delete_value(char *key);

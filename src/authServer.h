@@ -3,6 +3,7 @@
 
 #include "ssdict.h"
 #include <pthread.h>
+#include <netinet/in.h>
 
 typedef struct {
     int socket;
@@ -14,12 +15,8 @@ typedef struct {
     int len;
 } handle_message_ta;
 
-
 int init_main_socket(int port);
-char* generate_secret(void);
+char *generate_secret(void);
 void *handle_message_thread(void *args);
-
-
-
 
 #endif

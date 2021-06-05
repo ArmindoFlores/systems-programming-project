@@ -11,7 +11,7 @@
 #define CLIENTID_SIZE 16
 
 typedef enum {
-    ACK=1,
+    ACK = 1,
     PUT_VALUE,
     GET_VALUE,
     DEL_VALUE,
@@ -34,7 +34,6 @@ typedef struct {
     size_t size;
     msgtype_t type;
 } __attribute__((packed)) msgheader_t;
-
 
 /*
  * Loops until exactly n bytes are read from the socket.
