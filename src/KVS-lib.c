@@ -82,6 +82,7 @@ int establish_connection(char *group_id, char *secret)
     if (connected) return ALREADY_CONNECTED;
 
     char pid[32] = "", csecret[CLIENTID_SIZE];
+    sprintf(pid, "%d", getpid());
 
     server = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server == -1) return SOCK_ERROR;

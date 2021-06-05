@@ -117,8 +117,7 @@ void *handle_message_thread(void *args)
             message[0] = ERROR;
             printf("Delete group request failed\n");
         }
-        message[1]='\0';
-        sendto(ta->socket, (const char *) message, strlen(message)+1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
+        sendto(ta->socket, message, 1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
         free(gid);
         free(message);
         break;
@@ -146,9 +145,8 @@ void *handle_message_thread(void *args)
             message[0] = ACK;
             printf("Login request succeeded\n");
         }
-        message[1]='\0';
 
-        sendto(ta->socket, (const char *) message, strlen(message)+1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
+        sendto(ta->socket, message, 1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
         free(secret);
         free(gid);
         free(message);
@@ -158,7 +156,7 @@ void *handle_message_thread(void *args)
         printf("Received garbage %d\n", (int) ta->buffer[0]);
         message = (char *) malloc(sizeof(char));
         message[0] = ERROR;
-        sendto(ta->socket, (const char *) message, strlen(message), MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
+        sendto(ta->socket, message, 1, MSG_DONTWAIT, (const struct sockaddr *) &caddr, ta->len);
         free(message);
         break;
     }
@@ -190,8 +188,6 @@ int main(int argc, char *argv[])
         n = recvfrom(socket, buffer, MAX_GROUPID_SIZE + SECRET_SIZE + 1 + 1, MSG_DONTWAIT, (struct sockaddr *) &caddr, (socklen_t *) &len);
         if (n > 0) {
             buffer[n] = '\0';
-            printf("buffer: %s (n: %d)\n", buffer + 1, n);
-            // printf("client: %s size= %d: %s\n",inet_ntoa(caddr.sin_addr),n, buffer);
             handle_message_ta *args = (handle_message_ta *) malloc(sizeof(handle_message_ta));
             if (args == NULL) {
                 printf("Error allocating memory!\n");
