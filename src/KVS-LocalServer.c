@@ -22,6 +22,7 @@
 
 typedef struct {
     char *groupid;
+    char *secret;
     ssdict_t *d;
     ulist_t *callbacks;
     pthread_mutex_t mutex;
@@ -98,6 +99,7 @@ void free_glelement(void *arg)
     ulist_free(element->callbacks);
     ssdict_free(element->d);
     free(element->groupid);
+    free(element->secret);
     pthread_mutex_destroy(&element->mutex);
     free(element);
 }
@@ -568,10 +570,12 @@ int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
 
         group->d = ssdict_create(16);
         group->groupid = (char *) malloc(sizeof(char) * (gidlen + 1));
-        if (group->d == NULL || group->groupid == NULL) {
+        group->secret = (char *) malloc(sizeof(char) * (SECRET_SIZE + 1));
+        if (group->d == NULL || group->groupid == NULL || group->secret == NULL) {
             free(group->d);
             free(group->groupid);
             free(groupid);
+            free(group->secret);
             fprintf(stderr, "Memory error (internal error)\n");
             pthread_mutex_unlock(&grouplist.mutex);
             return -1;
@@ -579,6 +583,8 @@ int create_group(char *groupid, int as, struct sockaddr_in sv_addr)
 
         strcpy(group->groupid, groupid);
         group->groupid[gidlen] = '\0';
+        strcpy(group->secret, buffer+1);
+        group->secret[SECRET_SIZE] = '\0';
 
         group->callbacks = ulist_create(free_cbclient);
         if (group->callbacks == NULL) {
@@ -917,7 +923,7 @@ int main(int argc, char *argv[])
             glelement_t *found = NULL;
             if ((found = (glelement_t *) ulist_find_element_if(grouplist.list, find_glelement, groupid)) != NULL) {
                 ssdict_print(found->d);
-                printf("\n");
+                printf(" -> [secret: %s]\n", found->secret);
             } else
                 printf("Group not found\n");
             break;
