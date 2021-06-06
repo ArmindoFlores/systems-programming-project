@@ -14,22 +14,22 @@ char getOption(char* arg);
 void callback1(char *value)
 {
     if (value != NULL)
-        printf("OMG the value changed to '%s'\n", value);
+        printf("The value of name was changed to '%s'\n", value);
     else
-        printf("OMG the value was deleted\n");
+        printf("The KV-pair name was deleted\n");
 }
 
 int main(int argc, char *argv[]) 
 {
     int result;
-    if (argc >= 3)
+    if (argc == 3)
         if(strlen(argv[2])==16)
             result = establish_connection(argv[1], argv[2]);
         else{
-            printf("Secret has to be a 16 character string\n");
+            printf("SECRET has to be a 16 character string\n");
             exit(EXIT_FAILURE);
     }else{
-        printf("Input group id and a 16 character string\n");
+        printf("Usage: %s GROUPID SECRET\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 

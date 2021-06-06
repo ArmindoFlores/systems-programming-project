@@ -15,7 +15,7 @@ WINDOW *txtwindow, *owindow;
 
 void print_usage(char **argv) 
 {
-    printf("Usage: %s USERNAME GROUP SECRET\n", argv[0]);
+    printf("Usage: %s USERNAME GROUPID SECRET\n", argv[0]);
     exit(EXIT_FAILURE);
 }
 
@@ -25,6 +25,16 @@ void stop(int code)
     delwin(txtwindow);
     endwin();
     exit(code);
+}
+
+void update()
+{
+    int y, x, r, c;
+    getyx(txtwindow, y, x);
+    getmaxyx(txtwindow, r, c);
+
+    if (y >= r)
+        scroll(txtwindow);
 }
 
 void new_message(char *value)
@@ -40,16 +50,6 @@ void new_message(char *value)
     wmove(owindow, y, x);
     wrefresh(txtwindow);
     pthread_mutex_unlock(&print_mutex);
-}
-
-void update()
-{
-    int y, x, r, c;
-    getyx(txtwindow, y, x);
-    getmaxyx(txtwindow, r, c);
-
-    if (y >= r)
-        scroll(txtwindow);
 }
 
 int main(int argc, char **argv)
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
     char *line = NULL;
     int size = 0;
     char running = 1;
-    int r, c, x, y;
+    int r, c;
     while (running) {
         getmaxyx(stdscr, r, c);
 

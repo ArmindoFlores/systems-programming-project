@@ -168,8 +168,8 @@ void *handle_message_thread(void *args)
 int main(int argc, char *argv[])
 {
 
-    if (argc < 2) {
-        printf("Input port number\n");
+    if (argc != 2) {
+        printf("Usage: %s PORT_NUMBER\n", argv[0]);
         exit(-1);
     }
 

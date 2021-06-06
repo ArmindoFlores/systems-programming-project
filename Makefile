@@ -17,7 +17,7 @@ HEADERS = $(wildcard $(SRCDIR)/*.h)
 
 VPATH = main:src
 
-all: lib demo1 lserver aserver
+all: lib demo1 demo2 lserver aserver
 	
 lib: $(LIBDIR)/$(LIBNAME).so
 

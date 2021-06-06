@@ -979,7 +979,7 @@ int main(int argc, char *argv[])
 
         default:
             fprintf(stderr, "Usage:\n \texit ---> Disconnects\n\tshow <groupid> ---> Shows Secret and Key-Value pairs from groupid\n\tcreate <groupid>  ---> "
-                            "Creates Group with id <groupid> \n\tdelete <groupid> ---> Deletes group with id <groupid>\n\tstatus ---> Shows application "
+                            "Creates group with ID <groupid> \n\tdelete <groupid> ---> Deletes group with ID <groupid>\n\tstatus ---> Shows application "
                             "status\n\n");
             break;
         }
